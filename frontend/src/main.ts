@@ -6,11 +6,13 @@ import { createApp } from 'vue';
 import App from './App.vue';
 import { configurePinia } from './PiniaConfig.js';
 import router from './router';
+import { seedDomainState } from './stores/domainseeder.js';
 
 const app = createApp(App);
 const pinia = createPinia();
 
 configurePinia(pinia);
+seedDomainState(pinia);
 
 app.use(pinia);
 app.use(router);
