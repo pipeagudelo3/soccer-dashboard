@@ -1,35 +1,48 @@
 @import './base.css';
 
+:root {
+  color-scheme: light;
+  --color-background: #f8fafc;
+  --color-background-soft: #ffffff;
+  --color-background-mute: #e2e8f0;
+  --color-border: #e2e8f0;
+  --color-border-hover: #cbd5e1;
+  --color-heading: #0f172a;
+  --color-text: #334155;
+  --section-gap: 4rem;
+}
+
+html {
+  min-width: 320px;
+  min-height: 100%;
+  background-color: var(--color-background);
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+  color: var(--color-text);
+  background-color: var(--color-background);
+}
+
 #app {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  font-weight: normal;
+  width: 100%;
+  min-height: 100vh;
 }
 
-a,
-.green {
-  text-decoration: none;
-  color: hsla(160, 100%, 37%, 1);
-  transition: 0.4s;
-  padding: 3px;
+a {
+  color: inherit;
 }
 
-@media (hover: hover) {
-  a:hover {
-    background-color: hsla(160, 100%, 37%, 0.2);
-  }
+button,
+input,
+select,
+textarea {
+  font: inherit;
 }
 
-@media (min-width: 1024px) {
-  body {
-    display: flex;
-    place-items: center;
-  }
-
-  #app {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    padding: 0 2rem;
-  }
+img {
+  display: block;
+  max-width: 100%;
 }
