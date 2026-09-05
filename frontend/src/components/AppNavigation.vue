@@ -30,6 +30,11 @@ const navigationItems: NavigationItem[] = [
     access: 'public',
   },
   {
+    label: 'About',
+    routeName: 'about',
+    access: 'public',
+  },
+  {
     label: 'Login',
     routeName: 'login',
     access: 'public',
