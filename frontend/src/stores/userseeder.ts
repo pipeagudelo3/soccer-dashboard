@@ -12,7 +12,7 @@ export const userSeedData: UserInterface[] = [
   },
   {
     id: 'user-regular-001',
-    name: 'Football Analyst',
+    name: 'Soccer Analyst',
     email: 'analyst@soccerdashboard.test',
     password: 'User123!',
     role: 'user',
