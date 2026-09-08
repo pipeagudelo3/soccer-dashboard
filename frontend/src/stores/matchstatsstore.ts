@@ -10,5 +10,21 @@ export const useMatchStatsStore = defineStore('matchStats', () => {
     matchStats.value = [...newMatchStats];
   }
 
-  return { matchStats, setMatchStats };
+  function addMatchStats(newMatchStats: MatchStatsInterface): void {
+    matchStats.value = [...matchStats.value, newMatchStats];
+  }
+
+  function updateMatchStats(updatedMatchStats: MatchStatsInterface): void {
+    matchStats.value = matchStats.value.map((currentMatchStats) =>
+      currentMatchStats.id === updatedMatchStats.id ? updatedMatchStats : currentMatchStats,
+    );
+  }
+
+  function removeMatchStats(matchStatsId: string): void {
+    matchStats.value = matchStats.value.filter(
+      (currentMatchStats) => currentMatchStats.id !== matchStatsId,
+    );
+  }
+
+  return { matchStats, setMatchStats, addMatchStats, updateMatchStats, removeMatchStats };
 });
