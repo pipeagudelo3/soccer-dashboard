@@ -2,7 +2,7 @@
 import { computed } from 'vue';
 import { RouterLink, useRouter } from 'vue-router';
 
-type NavigationAccess = 'public' | 'authenticated' | 'admin';
+type NavigationAccess = 'public' | 'guest' | 'authenticated' | 'admin';
 
 interface NavigationItem {
   label: string;
@@ -37,7 +37,7 @@ const navigationItems: NavigationItem[] = [
   {
     label: 'Login',
     routeName: 'login',
-    access: 'public',
+    access: 'guest',
   },
   {
     label: 'Dashboard',
@@ -84,6 +84,10 @@ const navigationItems: NavigationItem[] = [
 function canAccess(item: NavigationItem): boolean {
   if (item.access === 'public') {
     return true;
+  }
+
+  if (item.access === 'guest') {
+    return !props.isAuthenticated;
   }
 
   if (!props.isAuthenticated) {

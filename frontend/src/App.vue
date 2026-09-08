@@ -11,6 +11,7 @@ const authStore = useAuthStore();
   <div class="app-shell">
     <AppHeader
       :is-authenticated="authStore.isAuthenticated"
+      :user-name="authStore.currentUser?.name ?? null"
       :user-role="authStore.currentUser?.role ?? null"
     />
 

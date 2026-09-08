@@ -1,18 +1,28 @@
 <script setup lang="ts">
-import { RouterLink } from 'vue-router';
+import { RouterLink, useRouter } from 'vue-router';
 
 import AppNavigation from '@/components/AppNavigation.vue';
+import { AuthService } from '@/services/AuthService.js';
 
 const props = withDefaults(
   defineProps<{
     isAuthenticated?: boolean;
+    userName?: string | null;
     userRole?: string | null;
   }>(),
   {
     isAuthenticated: false,
+    userName: null,
     userRole: null,
   },
 );
+
+const router = useRouter();
+
+async function handleLogout(): Promise<void> {
+  AuthService.logout();
+  await router.push({ name: 'home' });
+}
 </script>
 
 <template>
@@ -28,6 +38,11 @@ const props = withDefaults(
       </RouterLink>
 
       <AppNavigation :is-authenticated="props.isAuthenticated" :user-role="props.userRole" />
+
+      <div v-if="props.isAuthenticated" class="user-status">
+        <span class="user-status-name">{{ props.userName }}</span>
+        <button type="button" class="logout-button" @click="handleLogout">Log out</button>
+      </div>
     </div>
   </header>
 </template>
@@ -47,7 +62,7 @@ const props = withDefaults(
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 2rem;
+  gap: 1.5rem;
   width: min(100% - 2rem, 1200px);
   min-height: 4.5rem;
   margin: 0 auto;
@@ -94,6 +109,35 @@ const props = withDefaults(
   font-size: 0.75rem;
 }
 
+.user-status {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-shrink: 0;
+}
+
+.user-status-name {
+  color: #dbeafe;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.logout-button {
+  padding: 0.45rem 0.85rem;
+  color: #dbeafe;
+  font-size: 0.8rem;
+  font-weight: 600;
+  background-color: transparent;
+  border: 1px solid #334155;
+  border-radius: 0.5rem;
+  cursor: pointer;
+}
+
+.logout-button:hover {
+  color: #ffffff;
+  background-color: rgba(255, 255, 255, 0.12);
+}
+
 @media (max-width: 700px) {
   .header-content {
     flex-direction: column;
@@ -107,6 +151,10 @@ const props = withDefaults(
 
   .app-header :deep(.app-navigation) {
     width: 100%;
+  }
+
+  .user-status {
+    align-self: flex-end;
   }
 }
 
