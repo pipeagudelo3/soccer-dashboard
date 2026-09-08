@@ -76,6 +76,10 @@ function refreshTeams(): void {
 }
 
 function openCreateForm(): void {
+  if (!authStore.isAdmin) {
+    return;
+  }
+
   editingTeam.value = null;
   feedbackMessage.value = null;
   isFormOpen.value = true;
@@ -138,7 +142,9 @@ function handleDelete(teamId: string): void {
         <h1>Teams</h1>
         <p>Browse, filter, and manage the teams competing this season.</p>
       </div>
-      <button type="button" class="button-primary" @click="openCreateForm">Add team</button>
+      <button v-if="authStore.isAdmin" type="button" class="button-primary" @click="openCreateForm">
+        Add team
+      </button>
     </header>
 
     <p v-if="feedbackMessage" class="feedback-message" role="alert">{{ feedbackMessage }}</p>

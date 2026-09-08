@@ -44,7 +44,7 @@ async function handleSubmit(): Promise<void> {
   <section class="login-view">
     <form class="login-card" @submit.prevent="handleSubmit">
       <h1>Log in</h1>
-      <p class="subtitle">Access the Football Dashboard with your account.</p>
+      <p class="subtitle">Access the Soccer Dashboard with your account.</p>
 
       <label>
         <span>Email</span>

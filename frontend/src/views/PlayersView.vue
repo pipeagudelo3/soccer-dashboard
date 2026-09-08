@@ -106,6 +106,10 @@ function refreshPlayers(): void {
 }
 
 function openCreateForm(): void {
+  if (!authStore.isAdmin) {
+    return;
+  }
+
   editingPlayer.value = null;
   isFormOpen.value = true;
 }
@@ -161,7 +165,9 @@ function handleDelete(playerId: string): void {
         <h1>Players</h1>
         <p>Filter the roster and manage player records and statistics.</p>
       </div>
-      <button type="button" class="button-primary" @click="openCreateForm">Add player</button>
+      <button v-if="authStore.isAdmin" type="button" class="button-primary" @click="openCreateForm">
+        Add player
+      </button>
     </header>
 
     <PlayerFormPanel

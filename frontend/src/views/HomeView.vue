@@ -23,7 +23,7 @@ const summaryCards = computed(() => [
 <template>
   <div class="home-view">
     <section class="hero">
-      <h1>Football Dashboard</h1>
+      <h1>Soccer Dashboard</h1>
       <p>
         Track teams, players, and match statistics in one place. Log in to explore filterable tables
         and charts built from the current season's data.
