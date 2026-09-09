@@ -4,6 +4,7 @@ import { computed, ref } from 'vue';
 import ChartCard from '@/components/ChartCard.vue';
 import DataTable from '@/components/DataTable.vue';
 import FilterSelect from '@/components/FilterSelect.vue';
+import type { TeamInterface } from '@/interfaces/TeamInterface.js';
 import { MatchStatsService } from '@/services/MatchStatsService.js';
 
 const matchStats = computed(() => MatchStatsService.getMatchStats());
@@ -85,29 +86,48 @@ const matchRows = computed(() =>
 );
 
 const goalsByTeamChart = computed(() => {
-  const goalsByTeam = new Map<string, number>();
+  const goalsByTeamId = new Map<
+    string,
+    {
+      name: string;
+      country: string;
+      goals: number;
+    }
+  >();
 
-  for (const match of filteredMatchStats.value) {
-    goalsByTeam.set(
-      match.homeTeam.name,
-      (goalsByTeam.get(match.homeTeam.name) ?? 0) + match.goalsHomeTeam,
-    );
-    goalsByTeam.set(
-      match.awayTeam.name,
-      (goalsByTeam.get(match.awayTeam.name) ?? 0) + match.goalsAwayTeam,
-    );
+  function addGoals(team: TeamInterface, goals: number): void {
+    const currentTeam = goalsByTeamId.get(team.id);
+
+    goalsByTeamId.set(team.id, {
+      name: team.name,
+      country: team.country,
+      goals: (currentTeam?.goals ?? 0) + goals,
+    });
   }
 
-  const sortedTotals = [...goalsByTeam.entries()].sort(
-    ([, firstGoals], [, secondGoals]) => secondGoals - firstGoals,
+  for (const match of filteredMatchStats.value) {
+    addGoals(match.homeTeam, match.goalsHomeTeam);
+    addGoals(match.awayTeam, match.goalsAwayTeam);
+  }
+
+  const teamNameCounts = new Map<string, number>();
+
+  for (const team of goalsByTeamId.values()) {
+    teamNameCounts.set(team.name, (teamNameCounts.get(team.name) ?? 0) + 1);
+  }
+
+  const sortedTotals = [...goalsByTeamId.values()].sort(
+    (firstTeam, secondTeam) => secondTeam.goals - firstTeam.goals,
   );
 
   return {
-    labels: sortedTotals.map(([teamName]) => teamName),
+    labels: sortedTotals.map((team) =>
+      (teamNameCounts.get(team.name) ?? 0) > 1 ? `${team.name} (${team.country})` : team.name,
+    ),
     datasets: [
       {
         label: 'Goals',
-        data: sortedTotals.map(([, goals]) => goals),
+        data: sortedTotals.map((team) => team.goals),
         backgroundColor: '#2563eb',
         borderRadius: 6,
       },

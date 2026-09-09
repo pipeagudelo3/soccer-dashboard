@@ -25,6 +25,13 @@ export class UserService {
   }
 
   static createUser(payload: CreateUserDTO): UserServiceResult {
+    if (!AuthService.isAdmin()) {
+      return {
+        success: false,
+        errors: ['Administrator access is required.'],
+      };
+    }
+
     const normalizedPayload = UserService.normalizePayload(payload);
     const errors = UserService.validateUser(normalizedPayload);
 
@@ -46,6 +53,13 @@ export class UserService {
   }
 
   static updateUser(id: string, payload: UpdateUserDTO): UserServiceResult {
+    if (!AuthService.isAdmin()) {
+      return {
+        success: false,
+        errors: ['Administrator access is required.'],
+      };
+    }
+
     const existingUser = UserService.getUserById(id);
 
     if (existingUser === undefined) {
@@ -85,6 +99,13 @@ export class UserService {
   }
 
   static deleteUser(id: string): UserServiceResult {
+    if (!AuthService.isAdmin()) {
+      return {
+        success: false,
+        errors: ['Administrator access is required.'],
+      };
+    }
+
     const existingUser = UserService.getUserById(id);
 
     if (existingUser === undefined) {

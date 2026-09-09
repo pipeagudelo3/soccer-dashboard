@@ -1,6 +1,7 @@
 import type { CreateMatchStatsDTO } from '@/dtos/CreateMatchStatsDTO.js';
 import type { UpdateMatchStatsDTO } from '@/dtos/UpdateMatchStatsDTO.js';
 import type { MatchStatsInterface } from '@/interfaces/MatchStatsInterface.js';
+import { AuthService } from '@/services/AuthService.js';
 import { TeamService } from '@/services/TeamService.js';
 import { useMatchStatsStore } from '@/stores/matchstatsstore.js';
 import { generateId } from '@/utils/generateId.js';
@@ -21,6 +22,13 @@ export class MatchStatsService {
   }
 
   static createMatchStats(payload: CreateMatchStatsDTO): MatchStatsServiceResult {
+    if (!AuthService.isAdmin()) {
+      return {
+        success: false,
+        errors: ['Administrator access is required.'],
+      };
+    }
+
     const validatedPayload = MatchStatsService.validateAndNormalizePayload(payload);
 
     if (validatedPayload.errors.length > 0 || validatedPayload.payload === undefined) {
@@ -41,6 +49,13 @@ export class MatchStatsService {
   }
 
   static updateMatchStats(id: string, payload: UpdateMatchStatsDTO): MatchStatsServiceResult {
+    if (!AuthService.isAdmin()) {
+      return {
+        success: false,
+        errors: ['Administrator access is required.'],
+      };
+    }
+
     const existingMatchStats = MatchStatsService.getMatchStatsById(id);
 
     if (existingMatchStats === undefined) {
@@ -74,6 +89,13 @@ export class MatchStatsService {
   }
 
   static deleteMatchStats(id: string): MatchStatsServiceResult {
+    if (!AuthService.isAdmin()) {
+      return {
+        success: false,
+        errors: ['Administrator access is required.'],
+      };
+    }
+
     const existingMatchStats = MatchStatsService.getMatchStatsById(id);
 
     if (existingMatchStats === undefined) {
