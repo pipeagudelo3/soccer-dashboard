@@ -39,6 +39,14 @@ export class AuthService {
     return useAuthStore().isAdmin;
   }
 
+  static synchronizeCurrentUser(user: UserInterface): void {
+    const authStore = useAuthStore();
+
+    if (authStore.currentUser?.id === user.id) {
+      authStore.setCurrentUser(AuthService.createAuthenticatedUser(user));
+    }
+  }
+
   private static createAuthenticatedUser(user: UserInterface): AuthenticatedUserInterface {
     return {
       id: user.id,

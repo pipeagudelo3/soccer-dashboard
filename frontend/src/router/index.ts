@@ -57,6 +57,53 @@ const router = createRouter({
         requiresAuth: true,
       },
     },
+    {
+      path: '/matches',
+      name: 'matches',
+      component: () => import('@/views/MatchStatsView.vue'),
+      meta: {
+        title: 'Match Statistics',
+        requiresAuth: true,
+      },
+    },
+    {
+      path: '/statistics',
+      name: 'statistics',
+      component: () => import('@/views/StatisticsView.vue'),
+      meta: {
+        title: 'Statistics',
+        requiresAuth: true,
+      },
+    },
+    {
+      path: '/team-comparison',
+      name: 'team-comparison',
+      component: () => import('@/views/TeamComparisonView.vue'),
+      meta: {
+        title: 'Team Comparison',
+        requiresAuth: true,
+      },
+    },
+    {
+      path: '/admin/users',
+      name: 'admin.users',
+      component: () => import('@/views/AdminUsersView.vue'),
+      meta: {
+        title: 'User Management',
+        requiresAuth: true,
+        requiresAdmin: true,
+      },
+    },
+    {
+      path: '/admin/match-stats',
+      name: 'admin.match-stats',
+      component: () => import('@/views/AdminMatchStatsView.vue'),
+      meta: {
+        title: 'Match Statistics Management',
+        requiresAuth: true,
+        requiresAdmin: true,
+      },
+    },
   ],
 });
 
