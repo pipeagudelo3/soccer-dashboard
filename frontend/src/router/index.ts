@@ -107,9 +107,7 @@ const router = createRouter({
   ],
 });
 
-// Route guard: enforces authentication and admin-only access declared through
-// route meta (`requiresAuth` / `requiresAdmin`), and keeps already-authenticated
-// users away from the login page. See Programming Rules, section 12.
+// Enforce the access requirements declared in each route's metadata.
 router.beforeEach((to) => {
   const authStore = useAuthStore();
 

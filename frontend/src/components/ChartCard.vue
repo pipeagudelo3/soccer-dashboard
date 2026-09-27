@@ -1,6 +1,5 @@
 <script setup lang="ts">
-// Reusable Chart.js wrapper so views never repeat chart bootstrapping,
-// registration, or teardown logic (see Programming Rules, section 16).
+// Centralize Chart.js registration, rendering, and teardown for every chart view.
 import { Chart, type ChartData, type ChartOptions, type ChartType, registerables } from 'chart.js';
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
