@@ -6,7 +6,7 @@ and Vite.
 
 ## Requirements
 
-- Node.js 22.18 or newer (Node.js 24.12 or newer is also supported)
+- Node.js 22.18.x or Node.js 24.12 or newer
 - npm
 
 ## Project setup
