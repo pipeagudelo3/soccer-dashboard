@@ -1,42 +1,50 @@
-# frontend
+# Soccer Dashboard
 
-This template should help get you started developing with Vue 3 in Vite.
+Soccer Dashboard is an academic web application for managing and analyzing teams, players, match
+results, and season statistics. It is built with Vue 3, TypeScript, Pinia, Vue Router, Chart.js,
+and Vite.
 
-## Recommended IDE Setup
+## Requirements
 
-[VS Code](https://code.visualstudio.com/) + [Vue (Official)](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur).
+- Node.js 22.18 or newer (Node.js 24.12 or newer is also supported)
+- npm
 
-## Recommended Browser Setup
-
-- Chromium-based browsers (Chrome, Edge, Brave, etc.):
-  - [Vue.js devtools](https://chromewebstore.google.com/detail/vuejs-devtools/nhdogjmejiglipccpnnnanhbledajbpd)
-  - [Turn on Custom Object Formatter in Chrome DevTools](http://bit.ly/object-formatters)
-- Firefox:
-  - [Vue.js devtools](https://addons.mozilla.org/en-US/firefox/addon/vue-js-devtools/)
-  - [Turn on Custom Object Formatter in Firefox DevTools](https://fxdx.dev/firefox-devtools-custom-object-formatters/)
-
-## Type Support for `.vue` Imports in TS
-
-TypeScript cannot handle type information for `.vue` imports by default, so we replace the `tsc` CLI with `vue-tsc` for type checking. In editors, we need [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) to make the TypeScript language service aware of `.vue` types.
-
-## Customize configuration
-
-See [Vite Configuration Reference](https://vite.dev/config/).
-
-## Project Setup
+## Project setup
 
 ```sh
 npm install
 ```
 
-### Compile and Hot-Reload for Development
+## Development
+
+Start the Vite development server:
 
 ```sh
 npm run dev
 ```
 
-### Type-Check, Compile and Minify for Production
+Create and preview a production build:
 
 ```sh
 npm run build
+npm run preview
 ```
+
+## Code quality
+
+```sh
+npm run lint          # Check Vue and TypeScript files with ESLint
+npm run lint:fix      # Apply safe ESLint fixes
+npm run format        # Format the entire project with Prettier
+npm run format:check  # Verify formatting without changing files
+npm run type-check    # Check Vue and TypeScript types
+npm run verify        # Run lint, formatting, type checking, and a production build
+```
+
+Run `npm run verify` before opening a pull request.
+
+## Recommended editor
+
+Use [Visual Studio Code](https://code.visualstudio.com/) with the
+[Vue - Official](https://marketplace.visualstudio.com/items?itemName=Vue.volar) and
+[Prettier](https://marketplace.visualstudio.com/items?itemName=esbenp.prettier-vscode) extensions.

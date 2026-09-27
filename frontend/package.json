@@ -9,7 +9,11 @@
     "preview": "vite preview",
     "build-only": "vite build",
     "type-check": "vue-tsc --build",
-    "format": "prettier --write --experimental-cli src/"
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write --experimental-cli .",
+    "format:check": "prettier --check --experimental-cli .",
+    "verify": "run-s lint format:check type-check build-only"
   },
   "dependencies": {
     "chart.js": "^4.5.1",
@@ -21,7 +25,11 @@
     "@tsconfig/node24": "^24.0.4",
     "@types/node": "^24.13.3",
     "@vitejs/plugin-vue": "^6.0.8",
+    "@vue/eslint-config-prettier": "^10.2.0",
+    "@vue/eslint-config-typescript": "^14.9.0",
     "@vue/tsconfig": "^0.9.1",
+    "eslint": "^10.11.0",
+    "eslint-plugin-vue": "^10.11.1",
     "npm-run-all2": "^9.0.2",
     "prettier": "3.9.5",
     "typescript": "~6.0.0",
