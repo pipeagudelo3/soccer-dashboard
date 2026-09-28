@@ -2,7 +2,12 @@
 
 Soccer Dashboard is an academic web application for managing and analyzing teams, players, match
 results, and season statistics. It is built with Vue 3, TypeScript, Pinia, Vue Router, Chart.js,
-and Vite.
+SweetAlert2, and Vite.
+
+Chart.js provides the data visualizations. SweetAlert2 provides centralized deletion dialogs and
+operation notifications, replacing native confirmations with consistent feedback. A second charting
+library is intentionally unnecessary because Chart.js already covers every visualization required by
+the project.
 
 ## Requirements
 
@@ -42,6 +47,9 @@ npm run verify        # Run lint, formatting, type checking, and a production bu
 ```
 
 Run `npm run verify` before opening a pull request.
+
+The global font-weight reset remains unchanged in this phase to avoid an application-wide visual
+change; it should be reviewed as part of the next visual consistency phase.
 
 ## Recommended editor
 

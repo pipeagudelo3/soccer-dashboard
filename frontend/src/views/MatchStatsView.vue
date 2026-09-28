@@ -4,6 +4,7 @@ import { computed, ref } from 'vue';
 import ChartCard from '@/components/ChartCard.vue';
 import DataTable from '@/components/DataTable.vue';
 import FilterSelect from '@/components/FilterSelect.vue';
+import PageHeader from '@/components/PageHeader.vue';
 import { MatchStatsService } from '@/services/MatchStatsService.js';
 import { TeamService } from '@/services/TeamService.js';
 
@@ -173,15 +174,16 @@ function clearFilters(): void {
 
 <template>
   <div class="match-stats-view">
-    <header class="view-header">
-      <div>
-        <h1>Match statistics</h1>
-        <p>Analyze match results, goals, stadiums, and attendance.</p>
-      </div>
-      <span class="result-count">
-        {{ filteredMatchStats.length }} of {{ matchStats.length }} matches
-      </span>
-    </header>
+    <PageHeader
+      title="Match statistics"
+      description="Analyze match results, goals, stadiums, and attendance."
+    >
+      <template #actions>
+        <span class="result-count">
+          {{ filteredMatchStats.length }} of {{ matchStats.length }} matches
+        </span>
+      </template>
+    </PageHeader>
 
     <section class="filters-bar" aria-label="Match filters">
       <FilterSelect v-model="teamFilter" label="Team" :options="teamOptions" />
@@ -217,6 +219,7 @@ function clearFilters(): void {
       :columns="matchColumns"
       :rows="matchRows"
       row-key="id"
+      caption="Filtered match results, stadiums, and attendance"
       empty-message="No matches match the selected filters."
     />
   </div>
@@ -227,23 +230,6 @@ function clearFilters(): void {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
-}
-
-.view-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem;
-}
-
-.view-header h1 {
-  margin: 0 0 0.35rem;
-  color: #0f172a;
-}
-
-.view-header p {
-  margin: 0;
-  color: #64748b;
 }
 
 .result-count {
@@ -312,10 +298,6 @@ function clearFilters(): void {
 }
 
 @media (max-width: 700px) {
-  .view-header {
-    flex-direction: column;
-  }
-
   .filters-bar > * {
     width: 100%;
   }

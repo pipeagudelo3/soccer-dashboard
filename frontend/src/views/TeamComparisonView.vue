@@ -4,6 +4,7 @@ import { computed, ref } from 'vue';
 import ChartCard from '@/components/ChartCard.vue';
 import DataTable from '@/components/DataTable.vue';
 import FilterSelect from '@/components/FilterSelect.vue';
+import PageHeader from '@/components/PageHeader.vue';
 import { MatchStatsService } from '@/services/MatchStatsService.js';
 import { PlayerService } from '@/services/PlayerService.js';
 import { TeamService } from '@/services/TeamService.js';
@@ -237,10 +238,10 @@ const goalsChart = computed(() => {
 
 <template>
   <div class="team-comparison-view">
-    <header class="view-header">
-      <h1>Team comparison</h1>
-      <p>Compare two teams using their players and recorded match statistics.</p>
-    </header>
+    <PageHeader
+      title="Team comparison"
+      description="Compare two teams using their players and recorded match statistics."
+    />
 
     <section class="team-selectors" aria-label="Teams to compare">
       <FilterSelect v-model="firstTeamId" label="First team" :options="firstTeamOptions" />
@@ -288,6 +289,7 @@ const goalsChart = computed(() => {
         :columns="comparisonColumns"
         :rows="comparisonRows"
         row-key="id"
+        caption="Statistical comparison of the two selected teams"
         empty-message="No comparison data is available."
       />
     </template>
@@ -299,16 +301,6 @@ const goalsChart = computed(() => {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
-}
-
-.view-header h1 {
-  margin: 0 0 0.35rem;
-  color: #0f172a;
-}
-
-.view-header p {
-  margin: 0;
-  color: #64748b;
 }
 
 .team-selectors {

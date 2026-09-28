@@ -4,6 +4,7 @@ import { computed, ref } from 'vue';
 import ChartCard from '@/components/ChartCard.vue';
 import DataTable from '@/components/DataTable.vue';
 import FilterSelect from '@/components/FilterSelect.vue';
+import PageHeader from '@/components/PageHeader.vue';
 import { MatchStatsService } from '@/services/MatchStatsService.js';
 import { PlayerService } from '@/services/PlayerService.js';
 import { TeamService } from '@/services/TeamService.js';
@@ -288,13 +289,14 @@ function clearFilters(): void {
 
 <template>
   <div class="statistics-view">
-    <header class="view-header">
-      <div>
-        <h1>Statistics</h1>
-        <p>Explore indicators derived from player records and recorded matches.</p>
-      </div>
-      <button type="button" class="clear-button" @click="clearFilters">Clear filters</button>
-    </header>
+    <PageHeader
+      title="Statistics"
+      description="Explore indicators derived from player records and recorded matches."
+    >
+      <template #actions>
+        <button type="button" class="clear-button" @click="clearFilters">Clear filters</button>
+      </template>
+    </PageHeader>
 
     <section class="filters-bar" aria-label="Statistics filters">
       <FilterSelect v-model="teamFilter" label="Team" :options="teamOptions" />
@@ -340,6 +342,7 @@ function clearFilters(): void {
         :columns="playerColumns"
         :rows="playerRows"
         row-key="id"
+        caption="Filtered player goals and assists"
         empty-message="No players match the selected filters."
       />
     </section>
@@ -370,6 +373,7 @@ function clearFilters(): void {
         :columns="teamMatchColumns"
         :rows="teamMatchRows"
         row-key="id"
+        caption="Team results, goals, and attendance from filtered matches"
         empty-message="No matches match the selected filters."
       />
     </section>
@@ -384,20 +388,11 @@ function clearFilters(): void {
   gap: 1.5rem;
 }
 
-.view-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem;
-}
-
-.view-header h1,
 .section-header h2 {
   margin: 0 0 0.35rem;
   color: #0f172a;
 }
 
-.view-header p,
 .section-header p {
   margin: 0;
   color: #64748b;
@@ -506,10 +501,6 @@ function clearFilters(): void {
 }
 
 @media (max-width: 700px) {
-  .view-header {
-    flex-direction: column;
-  }
-
   .filters-bar > * {
     width: 100%;
   }

@@ -1,7 +1,7 @@
 <script setup lang="ts">
-// Centralize Chart.js registration, rendering, and teardown for every chart view.
+// Centralizes accessible Chart.js rendering, empty states, updates, and teardown.
 import { Chart, type ChartData, type ChartOptions, type ChartType, registerables } from 'chart.js';
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, useId, watch } from 'vue';
 
 Chart.register(...registerables);
 
@@ -15,15 +15,23 @@ interface Props {
 
 const props = defineProps<Props>();
 
+const componentId = useId();
+const titleId = `chart-title-${componentId}`;
+const descriptionId = `chart-description-${componentId}`;
 const canvasRef = ref<HTMLCanvasElement | null>(null);
 let chartInstance: Chart | null = null;
 
+const hasDataPoints = computed(() =>
+  props.data.datasets.some((dataset) => dataset.data.length > 0),
+);
+
 function renderChart(): void {
-  if (canvasRef.value === null) {
+  chartInstance?.destroy();
+  chartInstance = null;
+
+  if (!hasDataPoints.value || canvasRef.value === null) {
     return;
   }
-
-  chartInstance?.destroy();
 
   chartInstance = new Chart(canvasRef.value, {
     type: props.type,
@@ -38,7 +46,7 @@ function renderChart(): void {
 
 onMounted(renderChart);
 
-watch(() => [props.data, props.type, props.options], renderChart, { deep: true });
+watch(() => [props.data, props.type, props.options], renderChart, { deep: true, flush: 'post' });
 
 onBeforeUnmount(() => {
   chartInstance?.destroy();
@@ -48,12 +56,20 @@ onBeforeUnmount(() => {
 <template>
   <section class="chart-card">
     <header class="chart-card-header">
-      <h3>{{ props.title }}</h3>
-      <p v-if="props.description">{{ props.description }}</p>
+      <h3 :id="titleId">{{ props.title }}</h3>
+      <p v-if="props.description" :id="descriptionId">{{ props.description }}</p>
     </header>
-    <div class="chart-canvas-wrapper">
-      <canvas ref="canvasRef"></canvas>
+    <div v-if="hasDataPoints" class="chart-canvas-wrapper">
+      <canvas
+        ref="canvasRef"
+        role="img"
+        :aria-labelledby="titleId"
+        :aria-describedby="props.description ? descriptionId : undefined"
+      >
+        {{ props.title }} chart.
+      </canvas>
     </div>
+    <p v-else class="chart-empty" role="status">No data is available for this chart.</p>
   </section>
 </template>
 
@@ -83,5 +99,16 @@ onBeforeUnmount(() => {
 .chart-canvas-wrapper {
   position: relative;
   height: 260px;
+}
+
+.chart-empty {
+  display: grid;
+  place-items: center;
+  min-height: 260px;
+  margin: 0;
+  color: var(--color-text-muted);
+  text-align: center;
+  background-color: var(--color-background-subtle);
+  border-radius: 0.5rem;
 }
 </style>

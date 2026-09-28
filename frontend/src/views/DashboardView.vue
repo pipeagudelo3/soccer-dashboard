@@ -3,6 +3,7 @@ import { computed } from 'vue';
 
 import ChartCard from '@/components/ChartCard.vue';
 import DataTable from '@/components/DataTable.vue';
+import PageHeader from '@/components/PageHeader.vue';
 import { MatchStatsService } from '@/services/MatchStatsService.js';
 import { PlayerService } from '@/services/PlayerService.js';
 import { TeamService } from '@/services/TeamService.js';
@@ -98,10 +99,10 @@ const matchRows = computed(() =>
 
 <template>
   <div class="dashboard-view">
-    <header class="dashboard-header">
-      <h1>Dashboard</h1>
-      <p>Welcome back, {{ authStore.currentUser?.name }}. Here is the current season overview.</p>
-    </header>
+    <PageHeader
+      title="Dashboard"
+      :description="`Welcome back, ${authStore.currentUser?.name ?? 'user'}. Here is the current season overview.`"
+    />
 
     <section class="summary-grid">
       <article v-for="card in summaryCards" :key="card.label" class="summary-card">
@@ -132,6 +133,7 @@ const matchRows = computed(() =>
         :columns="matchColumns"
         :rows="matchRows"
         row-key="id"
+        caption="Latest recorded match results"
         empty-message="No matches recorded yet."
       />
     </section>
@@ -143,16 +145,6 @@ const matchRows = computed(() =>
   display: flex;
   flex-direction: column;
   gap: 2rem;
-}
-
-.dashboard-header h1 {
-  margin: 0 0 0.35rem;
-  color: #0f172a;
-}
-
-.dashboard-header p {
-  margin: 0;
-  color: #64748b;
 }
 
 .summary-grid {
