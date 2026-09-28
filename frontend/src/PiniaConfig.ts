@@ -17,6 +17,11 @@ interface PersistedPiniaState {
   state: Record<string, StateTree>;
 }
 
+interface LoadedPiniaState {
+  state: Record<string, StateTree>;
+  canPersist: boolean;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -189,36 +194,67 @@ function createInitialState(): Record<string, StateTree> {
   };
 }
 
-function backUpLegacyState(storedState: string): void {
-  if (localStorage.getItem(legacyStateBackupKey) === null) {
-    localStorage.setItem(legacyStateBackupKey, storedState);
+function backUpLegacyState(storedState: string): boolean {
+  try {
+    if (localStorage.getItem(legacyStateBackupKey) === null) {
+      localStorage.setItem(legacyStateBackupKey, storedState);
+    }
+
+    return true;
+  } catch (error: unknown) {
+    console.error('Unable to back up the legacy Pinia state in LocalStorage.', error);
+    return false;
   }
 }
 
-function loadState(): Record<string, StateTree> {
-  const storedState = localStorage.getItem(piniaStateKey);
+function loadState(): LoadedPiniaState {
+  let storedState: string | null;
+
+  try {
+    storedState = localStorage.getItem(piniaStateKey);
+  } catch (error: unknown) {
+    console.error('Unable to read the persisted Pinia state from LocalStorage.', error);
+    return { state: createInitialState(), canPersist: false };
+  }
 
   if (storedState === null) {
-    return createInitialState();
+    return { state: createInitialState(), canPersist: true };
   }
 
   try {
     const parsedState: unknown = JSON.parse(storedState);
 
     if (isPersistedPiniaState(parsedState)) {
-      return parsedState.state;
+      return { state: parsedState.state, canPersist: true };
     }
 
-    backUpLegacyState(storedState);
+    if (!backUpLegacyState(storedState)) {
+      return { state: createInitialState(), canPersist: false };
+    }
 
     if (isStateRecord(parsedState)) {
-      return migrateLegacyState(parsedState) ?? createInitialState();
+      const migratedState = migrateLegacyState(parsedState);
+
+      if (migratedState === null) {
+        console.error('Unable to migrate the legacy Pinia state. Initial data will be used.');
+      }
+
+      return {
+        state: migratedState ?? createInitialState(),
+        canPersist: true,
+      };
     }
-  } catch {
-    backUpLegacyState(storedState);
+
+    console.error('The persisted Pinia state has an invalid format. Initial data will be used.');
+  } catch (error: unknown) {
+    console.error('Unable to parse or migrate the persisted Pinia state.', error);
+
+    if (!backUpLegacyState(storedState)) {
+      return { state: createInitialState(), canPersist: false };
+    }
   }
 
-  return createInitialState();
+  return { state: createInitialState(), canPersist: true };
 }
 
 function persistState(state: Record<string, StateTree>): void {
@@ -227,11 +263,21 @@ function persistState(state: Record<string, StateTree>): void {
     state,
   };
 
-  localStorage.setItem(piniaStateKey, JSON.stringify(persistedState));
+  try {
+    localStorage.setItem(piniaStateKey, JSON.stringify(persistedState));
+  } catch (error: unknown) {
+    console.error('Unable to persist the Pinia state in LocalStorage.', error);
+  }
 }
 
 export function configurePinia(pinia: Pinia): void {
-  pinia.state.value = loadState();
+  const loadedState = loadState();
+  pinia.state.value = loadedState.state;
+
+  if (!loadedState.canPersist) {
+    return;
+  }
+
   persistState(pinia.state.value);
 
   watch(pinia.state, (state) => persistState(state), { deep: true });

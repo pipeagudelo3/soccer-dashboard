@@ -6,7 +6,8 @@ import MatchStatsFormPanel from '@/components/MatchStatsFormPanel.vue';
 import type { CreateMatchStatsDTO } from '@/dtos/CreateMatchStatsDTO.js';
 import type { UpdateMatchStatsDTO } from '@/dtos/UpdateMatchStatsDTO.js';
 import type { MatchStatsInterface } from '@/interfaces/MatchStatsInterface.js';
-import { MatchStatsService, type MatchStatsServiceResult } from '@/services/MatchStatsService.js';
+import { MatchStatsService } from '@/services/MatchStatsService.js';
+import type { ServiceResult } from '@/services/ServiceResult.js';
 import { TeamService } from '@/services/TeamService.js';
 
 const matchStats = computed(() => MatchStatsService.getMatchStats());
@@ -80,7 +81,7 @@ function closeForm(): void {
   feedbackErrors.value = [];
 }
 
-function handleResult(result: MatchStatsServiceResult, successMessage: string): boolean {
+function handleResult<T>(result: ServiceResult<T>, successMessage: string): boolean {
   if (!result.success) {
     feedbackErrors.value = result.errors;
     feedbackMessage.value = null;

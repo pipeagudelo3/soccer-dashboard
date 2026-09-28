@@ -27,12 +27,12 @@ async function handleSubmit(): Promise<void> {
     password: password.value,
   };
 
-  const isSuccessful = AuthService.login(credentials);
+  const result = AuthService.login(credentials);
 
   isSubmitting.value = false;
 
-  if (!isSuccessful) {
-    errorMessage.value = 'Invalid email or password.';
+  if (!result.success) {
+    errorMessage.value = result.errors[0] ?? 'Unable to log in.';
     return;
   }
 

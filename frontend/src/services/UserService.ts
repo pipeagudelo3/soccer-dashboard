@@ -2,18 +2,16 @@ import type { CreateUserDTO } from '@/dtos/CreateUserDTO.js';
 import type { UpdateUserDTO } from '@/dtos/UpdateUserDTO.js';
 import type { UserInterface } from '@/interfaces/UserInterface.js';
 import { AuthService } from '@/services/AuthService.js';
+import type { ServiceResult } from '@/services/ServiceResult.js';
 import { useUserStore } from '@/stores/userstore.js';
 import { generateId } from '@/utils/generateId.js';
 
 const ACCEPTED_USER_ROLES = ['admin', 'user'];
 const MINIMUM_PASSWORD_LENGTH = 8;
 
-export type UserServiceResult = {
-  success: boolean;
-  errors: string[];
-  user?: UserInterface;
-  deletedCurrentUser?: boolean;
-};
+export interface DeleteUserData {
+  deletedCurrentUser: boolean;
+}
 
 export class UserService {
   static getUsers(): UserInterface[] {
@@ -24,7 +22,7 @@ export class UserService {
     return useUserStore().users.find((user) => user.id === id);
   }
 
-  static createUser(payload: CreateUserDTO): UserServiceResult {
+  static createUser(payload: CreateUserDTO): ServiceResult<UserInterface> {
     if (!AuthService.isAdmin()) {
       return {
         success: false,
@@ -49,10 +47,10 @@ export class UserService {
 
     useUserStore().addUser(user);
 
-    return { success: true, errors: [], user };
+    return { success: true, data: user };
   }
 
-  static updateUser(id: string, payload: UpdateUserDTO): UserServiceResult {
+  static updateUser(id: string, payload: UpdateUserDTO): ServiceResult<UserInterface> {
     if (!AuthService.isAdmin()) {
       return {
         success: false,
@@ -95,10 +93,10 @@ export class UserService {
     useUserStore().updateUser(updatedUser);
     AuthService.synchronizeCurrentUser(updatedUser);
 
-    return { success: true, errors: [], user: updatedUser };
+    return { success: true, data: updatedUser };
   }
 
-  static deleteUser(id: string): UserServiceResult {
+  static deleteUser(id: string): ServiceResult<DeleteUserData> {
     if (!AuthService.isAdmin()) {
       return {
         success: false,
@@ -124,7 +122,7 @@ export class UserService {
       AuthService.logout();
     }
 
-    return { success: true, errors: [], deletedCurrentUser };
+    return { success: true, data: { deletedCurrentUser } };
   }
 
   private static normalizePayload(payload: CreateUserDTO): CreateUserDTO {
