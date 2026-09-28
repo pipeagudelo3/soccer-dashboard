@@ -6,10 +6,6 @@ import type { MatchStatsInterface } from '@/interfaces/MatchStatsInterface.js';
 export const useMatchStatsStore = defineStore('matchStats', () => {
   const matchStats = ref<MatchStatsInterface[]>([]);
 
-  function setMatchStats(newMatchStats: MatchStatsInterface[]): void {
-    matchStats.value = [...newMatchStats];
-  }
-
   function addMatchStats(newMatchStats: MatchStatsInterface): void {
     matchStats.value = [...matchStats.value, newMatchStats];
   }
@@ -26,5 +22,5 @@ export const useMatchStatsStore = defineStore('matchStats', () => {
     );
   }
 
-  return { matchStats, setMatchStats, addMatchStats, updateMatchStats, removeMatchStats };
+  return { matchStats, addMatchStats, updateMatchStats, removeMatchStats };
 });

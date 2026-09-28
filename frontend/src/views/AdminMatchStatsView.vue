@@ -11,6 +11,11 @@ import { TeamService } from '@/services/TeamService.js';
 
 const matchStats = computed(() => MatchStatsService.getMatchStats());
 const teams = computed(() => TeamService.getTeams());
+const teamNames = computed(() => new Map(teams.value.map((team) => [team.id, team.name])));
+
+function getTeamName(teamId: string): string {
+  return teamNames.value.get(teamId) ?? 'Unknown team';
+}
 
 const isFormOpen = ref(false);
 const editingMatchStats = ref<MatchStatsInterface | null>(null);
@@ -44,8 +49,8 @@ const matchStatsRows = computed(() =>
     .map((currentMatchStats) => ({
       id: currentMatchStats.id,
       date: dateFormatter.format(new Date(`${currentMatchStats.date}T00:00:00`)),
-      homeTeam: currentMatchStats.homeTeam.name,
-      awayTeam: currentMatchStats.awayTeam.name,
+      homeTeam: getTeamName(currentMatchStats.homeTeamId),
+      awayTeam: getTeamName(currentMatchStats.awayTeamId),
       score: `${currentMatchStats.goalsHomeTeam} - ${currentMatchStats.goalsAwayTeam}`,
       stadium: currentMatchStats.stadium,
       attendance: numberFormatter.format(currentMatchStats.attendance),
@@ -121,7 +126,7 @@ function handleDelete(matchStatsId: string): void {
   }
 
   const confirmed = window.confirm(
-    `Delete ${currentMatchStats.homeTeam.name} vs ${currentMatchStats.awayTeam.name}? This cannot be undone.`,
+    `Delete ${getTeamName(currentMatchStats.homeTeamId)} vs ${getTeamName(currentMatchStats.awayTeamId)}? This cannot be undone.`,
   );
 
   if (!confirmed) {

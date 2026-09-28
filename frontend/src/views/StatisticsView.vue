@@ -6,9 +6,16 @@ import DataTable from '@/components/DataTable.vue';
 import FilterSelect from '@/components/FilterSelect.vue';
 import { MatchStatsService } from '@/services/MatchStatsService.js';
 import { PlayerService } from '@/services/PlayerService.js';
+import { TeamService } from '@/services/TeamService.js';
 
 const players = computed(() => PlayerService.getPlayers());
 const matchStats = computed(() => MatchStatsService.getMatchStats());
+const teams = computed(() => TeamService.getTeams());
+const teamsById = computed(() => new Map(teams.value.map((team) => [team.id, team])));
+
+function getTeamName(teamId: string): string {
+  return teamsById.value.get(teamId)?.name ?? 'Unknown team';
+}
 
 const teamFilter = ref('all');
 const positionFilter = ref('all');
@@ -16,24 +23,12 @@ const startDateFilter = ref('');
 const endDateFilter = ref('');
 
 const teamOptions = computed(() => {
-  const teams = new Map<string, string>();
-
-  for (const player of players.value) {
-    if (player.team !== null) {
-      teams.set(player.team.id, player.team.name);
-    }
-  }
-
-  for (const match of matchStats.value) {
-    teams.set(match.homeTeam.id, match.homeTeam.name);
-    teams.set(match.awayTeam.id, match.awayTeam.name);
-  }
-
   return [
     { label: 'All teams', value: 'all' },
-    ...[...teams.entries()]
-      .sort(([, firstName], [, secondName]) => firstName.localeCompare(secondName))
-      .map(([id, name]) => ({ label: name, value: id })),
+    ...teams.value
+      .slice()
+      .sort((firstTeam, secondTeam) => firstTeam.name.localeCompare(secondTeam.name))
+      .map((team) => ({ label: team.name, value: team.id })),
   ];
 });
 
@@ -48,7 +43,7 @@ const positionOptions = computed(() => {
 
 const filteredPlayers = computed(() =>
   players.value.filter((player) => {
-    const matchesTeam = teamFilter.value === 'all' || player.team?.id === teamFilter.value;
+    const matchesTeam = teamFilter.value === 'all' || player.teamId === teamFilter.value;
     const matchesPosition =
       positionFilter.value === 'all' || player.position === positionFilter.value;
 
@@ -60,8 +55,8 @@ const filteredMatchStats = computed(() =>
   matchStats.value.filter((match) => {
     const matchesTeam =
       teamFilter.value === 'all' ||
-      match.homeTeam.id === teamFilter.value ||
-      match.awayTeam.id === teamFilter.value;
+      match.homeTeamId === teamFilter.value ||
+      match.awayTeamId === teamFilter.value;
     const matchesStartDate = startDateFilter.value === '' || match.date >= startDateFilter.value;
     const matchesEndDate = endDateFilter.value === '' || match.date <= endDateFilter.value;
 
@@ -100,32 +95,12 @@ const summaryCards = computed(() => [
   { label: 'Average attendance', value: numberFormatter.format(averageAttendance.value) },
 ]);
 
-function calculatePercentage(numerator: number, denominator: number): string {
-  if (denominator === 0) {
-    return '0%';
-  }
-
-  return `${Math.round((numerator / denominator) * 100)}%`;
-}
-
 const playerColumns = [
   { key: 'name', label: 'Player' },
   { key: 'team', label: 'Team' },
   { key: 'position', label: 'Position' },
   { key: 'goals', label: 'Goals', align: 'center' as const },
   { key: 'assists', label: 'Assists', align: 'center' as const },
-  { key: 'yellowCards', label: 'Yellow', align: 'center' as const },
-  { key: 'redCards', label: 'Red', align: 'center' as const },
-  { key: 'passes', label: 'Passes', align: 'right' as const },
-  { key: 'keyPasses', label: 'Key passes', align: 'right' as const },
-  { key: 'shots', label: 'Shots', align: 'right' as const },
-  { key: 'shotAccuracy', label: 'Shot accuracy', align: 'right' as const },
-  { key: 'tackles', label: 'Tackles', align: 'right' as const },
-  { key: 'interceptions', label: 'Interceptions', align: 'right' as const },
-  { key: 'dribbles', label: 'Dribbles', align: 'right' as const },
-  { key: 'dribbleSuccess', label: 'Dribble success', align: 'right' as const },
-  { key: 'duels', label: 'Duels W/L', align: 'right' as const },
-  { key: 'duelWinRate', label: 'Duel win rate', align: 'right' as const },
 ];
 
 const playerRows = computed(() =>
@@ -139,22 +114,10 @@ const playerRows = computed(() =>
     .map((player) => ({
       id: player.id,
       name: player.name,
-      team: player.team?.name ?? 'Free agent',
+      team: player.teamId === null ? 'Free agent' : getTeamName(player.teamId),
       position: player.position,
       goals: player.goals,
       assists: player.assists,
-      yellowCards: player.yellowCards,
-      redCards: player.redCards,
-      passes: numberFormatter.format(player.passes),
-      keyPasses: numberFormatter.format(player.keyPasses),
-      shots: numberFormatter.format(player.shots),
-      shotAccuracy: calculatePercentage(player.shotsOnTarget, player.shots),
-      tackles: numberFormatter.format(player.tackles),
-      interceptions: numberFormatter.format(player.interceptions),
-      dribbles: numberFormatter.format(player.dribbles),
-      dribbleSuccess: `${numberFormatter.format(player.dribblesSuccess)} (${calculatePercentage(player.dribblesSuccess, player.dribbles)})`,
-      duels: `${numberFormatter.format(player.duelsWon)} / ${numberFormatter.format(player.duelsLost)}`,
-      duelWinRate: calculatePercentage(player.duelsWon, player.duelsWon + player.duelsLost),
     })),
 );
 
@@ -180,36 +143,6 @@ const playerContributionsChart = computed(() => {
         label: 'Assists',
         data: leadingPlayers.map((player) => player.assists),
         backgroundColor: '#0f766e',
-        borderRadius: 6,
-      },
-    ],
-  };
-});
-
-const defensiveActionsChart = computed(() => {
-  const leadingPlayers = filteredPlayers.value
-    .slice()
-    .sort(
-      (firstPlayer, secondPlayer) =>
-        secondPlayer.tackles +
-        secondPlayer.interceptions -
-        (firstPlayer.tackles + firstPlayer.interceptions),
-    )
-    .slice(0, 8);
-
-  return {
-    labels: leadingPlayers.map((player) => player.name),
-    datasets: [
-      {
-        label: 'Tackles',
-        data: leadingPlayers.map((player) => player.tackles),
-        backgroundColor: '#f59e0b',
-        borderRadius: 6,
-      },
-      {
-        label: 'Interceptions',
-        data: leadingPlayers.map((player) => player.interceptions),
-        backgroundColor: '#7c3aed',
         borderRadius: 6,
       },
     ],
@@ -256,8 +189,8 @@ const teamMatchRows = computed(() => {
   }
 
   for (const match of filteredMatchStats.value) {
-    const homeTotals = getTeamTotals(match.homeTeam.id, match.homeTeam.name);
-    const awayTotals = getTeamTotals(match.awayTeam.id, match.awayTeam.name);
+    const homeTotals = getTeamTotals(match.homeTeamId, getTeamName(match.homeTeamId));
+    const awayTotals = getTeamTotals(match.awayTeamId, getTeamName(match.awayTeamId));
 
     homeTotals.played += 1;
     homeTotals.goalsFor += match.goalsHomeTeam;
@@ -329,7 +262,8 @@ const attendanceByMatchChart = computed(() => {
 
   return {
     labels: sortedMatches.map(
-      (match) => `${match.date}: ${match.homeTeam.name} vs ${match.awayTeam.name}`,
+      (match) =>
+        `${match.date}: ${getTeamName(match.homeTeamId)} vs ${getTeamName(match.awayTeamId)}`,
     ),
     datasets: [
       {
@@ -399,12 +333,6 @@ function clearFilters(): void {
           description="Goals and assists for the leading filtered players."
           type="bar"
           :data="playerContributionsChart"
-        />
-        <ChartCard
-          title="Defensive actions"
-          description="Tackles and interceptions for the leading filtered players."
-          type="bar"
-          :data="defensiveActionsChart"
         />
       </div>
 

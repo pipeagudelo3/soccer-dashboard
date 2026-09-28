@@ -1,10 +1,8 @@
-import type { TeamInterface } from '@/interfaces/TeamInterface.js';
-
 export interface MatchStatsInterface {
   id: string;
   date: string;
-  homeTeam: TeamInterface;
-  awayTeam: TeamInterface;
+  homeTeamId: string;
+  awayTeamId: string;
   goalsHomeTeam: number;
   goalsAwayTeam: number;
   stadium: string;

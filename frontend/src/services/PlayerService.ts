@@ -1,6 +1,7 @@
 import type { CreatePlayerDTO } from '@/dtos/CreatePlayerDTO.js';
 import type { UpdatePlayerDTO } from '@/dtos/UpdatePlayerDTO.js';
 import type { PlayerInterface } from '@/interfaces/PlayerInterface.js';
+import { TeamService } from '@/services/TeamService.js';
 import { usePlayerStore } from '@/stores/playerstore.js';
 import { generateId } from '@/utils/generateId.js';
 
@@ -13,7 +14,11 @@ export class PlayerService {
     return usePlayerStore().players.find((player) => player.id === id);
   }
 
-  static createPlayer(payload: CreatePlayerDTO): PlayerInterface {
+  static createPlayer(payload: CreatePlayerDTO): PlayerInterface | undefined {
+    if (!PlayerService.isValidTeamId(payload.teamId)) {
+      return undefined;
+    }
+
     const timestamp = new Date().toISOString();
 
     const player: PlayerInterface = {
@@ -35,9 +40,16 @@ export class PlayerService {
       return undefined;
     }
 
+    const teamId = payload.teamId === undefined ? existingPlayer.teamId : payload.teamId;
+
+    if (!PlayerService.isValidTeamId(teamId)) {
+      return undefined;
+    }
+
     const updatedPlayer: PlayerInterface = {
       ...existingPlayer,
       ...payload,
+      teamId,
       updatedAt: new Date().toISOString(),
     };
 
@@ -48,5 +60,9 @@ export class PlayerService {
 
   static deletePlayer(id: string): void {
     usePlayerStore().removePlayer(id);
+  }
+
+  private static isValidTeamId(teamId: string | null): boolean {
+    return teamId === null || TeamService.getTeamById(teamId) !== undefined;
   }
 }

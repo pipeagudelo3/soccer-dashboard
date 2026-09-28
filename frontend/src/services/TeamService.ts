@@ -58,7 +58,7 @@ export class TeamService {
     // recorded results keep pointing to a real team; deleting it here would silently
     // corrupt match history that this project stage cannot repair.
     const hasRecordedMatches = useMatchStatsStore().matchStats.some(
-      (matchStats) => matchStats.homeTeam.id === id || matchStats.awayTeam.id === id,
+      (matchStats) => matchStats.homeTeamId === id || matchStats.awayTeamId === id,
     );
 
     if (hasRecordedMatches) {
@@ -70,11 +70,9 @@ export class TeamService {
 
     useTeamStore().removeTeam(id);
 
-    // Players store a denormalized snapshot of their team, so a deleted team must be
-    // cleared from any player still pointing at it.
     usePlayerStore()
-      .players.filter((player) => player.team !== null && player.team.id === id)
-      .forEach((player) => usePlayerStore().updatePlayer({ ...player, team: null }));
+      .players.filter((player) => player.teamId === id)
+      .forEach((player) => usePlayerStore().updatePlayer({ ...player, teamId: null }));
 
     return { success: true };
   }

@@ -6,10 +6,6 @@ import type { PlayerInterface } from '@/interfaces/PlayerInterface.js';
 export const usePlayerStore = defineStore('players', () => {
   const players = ref<PlayerInterface[]>([]);
 
-  function setPlayers(newPlayers: PlayerInterface[]): void {
-    players.value = [...newPlayers];
-  }
-
   function addPlayer(player: PlayerInterface): void {
     players.value = [...players.value, player];
   }
@@ -24,5 +20,5 @@ export const usePlayerStore = defineStore('players', () => {
     players.value = players.value.filter((player) => player.id !== playerId);
   }
 
-  return { players, setPlayers, addPlayer, updatePlayer, removePlayer };
+  return { players, addPlayer, updatePlayer, removePlayer };
 });

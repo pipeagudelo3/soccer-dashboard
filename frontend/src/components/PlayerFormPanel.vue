@@ -1,84 +1,18 @@
 <script setup lang="ts">
-// Focused create/edit form for a single player. Statistics fields are driven
-// by a small config array (STAT_FIELDS) to avoid repeating near-identical
-// markup and typing logic for each of the player's numeric stats.
 import { reactive, watch } from 'vue';
 
 import type { CreatePlayerDTO } from '@/dtos/CreatePlayerDTO.js';
 import type { PlayerInterface } from '@/interfaces/PlayerInterface.js';
 import type { TeamInterface } from '@/interfaces/TeamInterface.js';
 
-type PlayerStatKey =
-  | 'matchesPlayed'
-  | 'minutesPlayed'
-  | 'goals'
-  | 'assists'
-  | 'yellowCards'
-  | 'redCards'
-  | 'foulsCommitted'
-  | 'foulsSuffered'
-  | 'passes'
-  | 'keyPasses'
-  | 'shots'
-  | 'shotsOnTarget'
-  | 'tackles'
-  | 'interceptions'
-  | 'dribbles'
-  | 'dribblesSuccess'
-  | 'duelsWon'
-  | 'duelsLost';
-
 interface PlayerFormState {
   name: string;
-  imageURL: string;
   position: string;
-  dateOfBirth: string;
-  nationality: string;
-  height: number;
-  weight: number;
-  jerseyNumber: number;
   status: string;
   teamId: string;
-  matchesPlayed: number;
-  minutesPlayed: number;
   goals: number;
   assists: number;
-  yellowCards: number;
-  redCards: number;
-  foulsCommitted: number;
-  foulsSuffered: number;
-  passes: number;
-  keyPasses: number;
-  shots: number;
-  shotsOnTarget: number;
-  tackles: number;
-  interceptions: number;
-  dribbles: number;
-  dribblesSuccess: number;
-  duelsWon: number;
-  duelsLost: number;
 }
-
-const STAT_FIELDS: { key: PlayerStatKey; label: string }[] = [
-  { key: 'matchesPlayed', label: 'Matches played' },
-  { key: 'minutesPlayed', label: 'Minutes played' },
-  { key: 'goals', label: 'Goals' },
-  { key: 'assists', label: 'Assists' },
-  { key: 'yellowCards', label: 'Yellow cards' },
-  { key: 'redCards', label: 'Red cards' },
-  { key: 'foulsCommitted', label: 'Fouls committed' },
-  { key: 'foulsSuffered', label: 'Fouls suffered' },
-  { key: 'passes', label: 'Passes' },
-  { key: 'keyPasses', label: 'Key passes' },
-  { key: 'shots', label: 'Shots' },
-  { key: 'shotsOnTarget', label: 'Shots on target' },
-  { key: 'tackles', label: 'Tackles' },
-  { key: 'interceptions', label: 'Interceptions' },
-  { key: 'dribbles', label: 'Dribbles' },
-  { key: 'dribblesSuccess', label: 'Successful dribbles' },
-  { key: 'duelsWon', label: 'Duels won' },
-  { key: 'duelsLost', label: 'Duels lost' },
-];
 
 const STATUS_OPTIONS = ['active', 'injured', 'suspended', 'free-agent'];
 
@@ -97,33 +31,11 @@ const emit = defineEmits<{
 function createEmptyForm(): PlayerFormState {
   return {
     name: '',
-    imageURL: '',
     position: '',
-    dateOfBirth: '',
-    nationality: '',
-    height: 0,
-    weight: 0,
-    jerseyNumber: 0,
     status: 'active',
     teamId: '',
-    matchesPlayed: 0,
-    minutesPlayed: 0,
     goals: 0,
     assists: 0,
-    yellowCards: 0,
-    redCards: 0,
-    foulsCommitted: 0,
-    foulsSuffered: 0,
-    passes: 0,
-    keyPasses: 0,
-    shots: 0,
-    shotsOnTarget: 0,
-    tackles: 0,
-    interceptions: 0,
-    dribbles: 0,
-    dribblesSuccess: 0,
-    duelsWon: 0,
-    duelsLost: 0,
   };
 }
 
@@ -137,18 +49,19 @@ watch(
       return;
     }
 
-    Object.assign(form, { ...player, teamId: player.team?.id ?? '' });
+    Object.assign(form, { ...player, teamId: player.teamId ?? '' });
   },
   { immediate: true },
 );
 
 function handleSubmit(): void {
-  const { teamId, ...rest } = form;
-  const selectedTeam = props.teams.find((team) => team.id === teamId) ?? null;
-
   const payload: CreatePlayerDTO = {
-    ...rest,
-    team: selectedTeam,
+    name: form.name,
+    position: form.position,
+    status: form.status,
+    teamId: form.teamId === '' ? null : form.teamId,
+    goals: form.goals,
+    assists: form.assists,
   };
 
   emit('submit', payload);
@@ -169,18 +82,6 @@ function handleSubmit(): void {
         <label>
           <span>Position</span>
           <input v-model="form.position" type="text" required />
-        </label>
-        <label>
-          <span>Nationality</span>
-          <input v-model="form.nationality" type="text" required />
-        </label>
-        <label>
-          <span>Date of birth</span>
-          <input v-model="form.dateOfBirth" type="date" required />
-        </label>
-        <label class="form-grid-full">
-          <span>Image URL</span>
-          <input v-model="form.imageURL" type="url" placeholder="https://..." required />
         </label>
       </div>
     </fieldset>
@@ -205,27 +106,19 @@ function handleSubmit(): void {
             </option>
           </select>
         </label>
-        <label>
-          <span>Jersey number</span>
-          <input v-model.number="form.jerseyNumber" type="number" min="0" required />
-        </label>
-        <label>
-          <span>Height (cm)</span>
-          <input v-model.number="form.height" type="number" min="0" required />
-        </label>
-        <label>
-          <span>Weight (kg)</span>
-          <input v-model.number="form.weight" type="number" min="0" required />
-        </label>
       </div>
     </fieldset>
 
     <fieldset>
-      <legend>Statistics</legend>
-      <div class="form-grid form-grid-stats">
-        <label v-for="field in STAT_FIELDS" :key="field.key">
-          <span>{{ field.label }}</span>
-          <input v-model.number="form[field.key]" type="number" min="0" />
+      <legend>Performance</legend>
+      <div class="form-grid">
+        <label>
+          <span>Goals</span>
+          <input v-model.number="form.goals" type="number" min="0" required />
+        </label>
+        <label>
+          <span>Assists</span>
+          <input v-model.number="form.assists" type="number" min="0" required />
         </label>
       </div>
     </fieldset>
@@ -272,14 +165,6 @@ legend {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.85rem;
-}
-
-.form-grid-stats {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-
-.form-grid-full {
-  grid-column: 1 / -1;
 }
 
 label {
@@ -344,15 +229,13 @@ select:focus {
 }
 
 @media (max-width: 720px) {
-  .form-grid,
-  .form-grid-stats {
+  .form-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 480px) {
-  .form-grid,
-  .form-grid-stats {
+  .form-grid {
     grid-template-columns: 1fr;
   }
 }

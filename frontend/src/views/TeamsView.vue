@@ -30,7 +30,7 @@ const countryOptions = computed(() => {
 });
 
 function playerCountForTeam(teamId: string): number {
-  return players.value.filter((player) => player.team?.id === teamId).length;
+  return players.value.filter((player) => player.teamId === teamId).length;
 }
 
 const filteredTeams = computed(() =>
