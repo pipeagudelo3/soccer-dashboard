@@ -1,7 +1,6 @@
 <script setup lang="ts">
-// Generic, reusable table used by every list page (Teams, Players, Dashboard).
-// Columns and cell rendering are configurable through props and named slots so
-// each page keeps its own presentation logic without duplicating table markup.
+// Shared table for dashboard, comparison, statistics, and administration views.
+// Columns and dynamic cell slots keep view-specific presentation outside the component.
 export interface DataTableColumn {
   key: string;
   label: string;
@@ -12,6 +11,7 @@ interface Props {
   columns: DataTableColumn[];
   rows: Record<string, unknown>[];
   rowKey: string;
+  caption: string;
   emptyMessage?: string;
 }
 
@@ -21,14 +21,20 @@ const props = withDefaults(defineProps<Props>(), {
 </script>
 
 <template>
-  <div class="data-table-wrapper">
+  <div class="data-table-wrapper" role="region" :aria-label="props.caption" tabindex="0">
     <table class="data-table">
+      <caption class="sr-only">
+        {{
+          props.caption
+        }}
+      </caption>
       <thead>
         <tr>
           <th
             v-for="column in props.columns"
             :key="column.key"
             :class="`align-${column.align ?? 'left'}`"
+            scope="col"
           >
             {{ column.label }}
           </th>

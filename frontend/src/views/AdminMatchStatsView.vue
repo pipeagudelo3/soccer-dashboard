@@ -3,12 +3,15 @@ import { computed, ref } from 'vue';
 
 import DataTable from '@/components/DataTable.vue';
 import MatchStatsFormPanel from '@/components/MatchStatsFormPanel.vue';
+import OperationFeedback from '@/components/OperationFeedback.vue';
+import PageHeader from '@/components/PageHeader.vue';
 import type { CreateMatchStatsDTO } from '@/dtos/CreateMatchStatsDTO.js';
 import type { UpdateMatchStatsDTO } from '@/dtos/UpdateMatchStatsDTO.js';
 import type { MatchStatsInterface } from '@/interfaces/MatchStatsInterface.js';
 import { MatchStatsService } from '@/services/MatchStatsService.js';
 import type { ServiceResult } from '@/services/ServiceResult.js';
 import { TeamService } from '@/services/TeamService.js';
+import { confirmDeletion, showError, showSuccess } from '@/utils/notifications.js';
 
 const matchStats = computed(() => MatchStatsService.getMatchStats());
 const teams = computed(() => TeamService.getTeams());
@@ -118,60 +121,62 @@ function handleInvalid(errors: string[]): void {
   feedbackMessage.value = null;
 }
 
-function handleDelete(matchStatsId: string): void {
+async function handleDelete(matchStatsId: string): Promise<void> {
   const currentMatchStats = MatchStatsService.getMatchStatsById(matchStatsId);
 
   if (currentMatchStats === undefined) {
-    feedbackErrors.value = ['The selected match statistics no longer exist.'];
+    await showError('The selected match statistics no longer exist.');
     return;
   }
 
-  const confirmed = window.confirm(
-    `Delete ${getTeamName(currentMatchStats.homeTeamId)} vs ${getTeamName(currentMatchStats.awayTeamId)}? This cannot be undone.`,
+  const confirmed = await confirmDeletion(
+    `${getTeamName(currentMatchStats.homeTeamId)} vs ${getTeamName(currentMatchStats.awayTeamId)}`,
   );
 
   if (!confirmed) {
     return;
   }
 
-  handleResult(
-    MatchStatsService.deleteMatchStats(matchStatsId),
-    'Match statistics deleted successfully.',
-  );
+  const result = MatchStatsService.deleteMatchStats(matchStatsId);
+
+  if (!result.success) {
+    feedbackErrors.value = [];
+    feedbackMessage.value = null;
+    await showError(result.errors.join(' ') || 'These match statistics could not be deleted.');
+    return;
+  }
+
+  feedbackErrors.value = [];
+  feedbackMessage.value = null;
+  isFormOpen.value = false;
+  editingMatchStats.value = null;
+  await showSuccess('Match statistics deleted successfully.');
 }
 </script>
 
 <template>
   <div class="admin-match-stats-view">
-    <header class="view-header">
-      <div>
-        <h1>Match statistics management</h1>
-        <p>Create and manage the match records used by the dashboard analysis.</p>
-      </div>
-      <button
-        type="button"
-        class="button-primary"
-        :disabled="teams.length < 2"
-        @click="openCreateForm"
-      >
-        Add match statistics
-      </button>
-    </header>
+    <PageHeader
+      title="Match statistics management"
+      description="Create and manage the match records used by the dashboard analysis."
+    >
+      <template #actions>
+        <button
+          type="button"
+          class="button-primary"
+          :disabled="teams.length < 2"
+          @click="openCreateForm"
+        >
+          Add match statistics
+        </button>
+      </template>
+    </PageHeader>
 
     <p v-if="teams.length < 2" class="feedback-warning" role="status">
       At least two teams are required before match statistics can be created.
     </p>
 
-    <section v-if="feedbackErrors.length > 0" class="feedback-errors" role="alert">
-      <strong>The operation could not be completed:</strong>
-      <ul>
-        <li v-for="error in feedbackErrors" :key="error">{{ error }}</li>
-      </ul>
-    </section>
-
-    <p v-if="feedbackMessage" class="feedback-success" role="status">
-      {{ feedbackMessage }}
-    </p>
+    <OperationFeedback :errors="feedbackErrors" :success-message="feedbackMessage" />
 
     <MatchStatsFormPanel
       v-if="isFormOpen"
@@ -187,6 +192,7 @@ function handleDelete(matchStatsId: string): void {
       :columns="matchStatsColumns"
       :rows="matchStatsRows"
       row-key="id"
+      caption="Recorded match statistics available for administration"
       empty-message="No match statistics are available."
     >
       <template #cell-actions="{ row }">
@@ -214,23 +220,6 @@ function handleDelete(matchStatsId: string): void {
   gap: 1.5rem;
 }
 
-.view-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem;
-}
-
-.view-header h1 {
-  margin: 0 0 0.35rem;
-  color: #0f172a;
-}
-
-.view-header p {
-  margin: 0;
-  color: #64748b;
-}
-
 .button-primary {
   padding: 0.6rem 1.1rem;
   color: #ffffff;
@@ -253,28 +242,11 @@ function handleDelete(matchStatsId: string): void {
   cursor: not-allowed;
 }
 
-.feedback-errors,
-.feedback-success,
 .feedback-warning {
   margin: 0;
   padding: 0.75rem 1rem;
   font-size: 0.85rem;
   border-radius: 0.5rem;
-}
-
-.feedback-errors {
-  color: #b91c1c;
-  background-color: #fee2e2;
-}
-
-.feedback-errors ul {
-  margin: 0.4rem 0 0;
-  padding-left: 1.25rem;
-}
-
-.feedback-success {
-  color: #166534;
-  background-color: #dcfce7;
 }
 
 .feedback-warning {
@@ -310,11 +282,5 @@ function handleDelete(matchStatsId: string): void {
   margin: 0;
   color: #64748b;
   font-size: 0.8rem;
-}
-
-@media (max-width: 640px) {
-  .view-header {
-    flex-direction: column;
-  }
 }
 </style>

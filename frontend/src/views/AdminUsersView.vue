@@ -3,6 +3,8 @@ import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
 
 import DataTable from '@/components/DataTable.vue';
+import OperationFeedback from '@/components/OperationFeedback.vue';
+import PageHeader from '@/components/PageHeader.vue';
 import UserFormPanel from '@/components/UserFormPanel.vue';
 import type { CreateUserDTO } from '@/dtos/CreateUserDTO.js';
 import type { UpdateUserDTO } from '@/dtos/UpdateUserDTO.js';
@@ -10,6 +12,7 @@ import type { UserInterface } from '@/interfaces/UserInterface.js';
 import type { ServiceResult } from '@/services/ServiceResult.js';
 import { UserService } from '@/services/UserService.js';
 import { useAuthStore } from '@/stores/authstore.js';
+import { confirmDeletion, showError, showSuccess } from '@/utils/notifications.js';
 
 const router = useRouter();
 const authStore = useAuthStore();
@@ -112,11 +115,11 @@ async function handleDelete(userId: string): Promise<void> {
   const user = UserService.getUserById(userId);
 
   if (user === undefined) {
-    feedbackErrors.value = ['The selected user no longer exists.'];
+    await showError('The selected user no longer exists.');
     return;
   }
 
-  const confirmed = window.confirm(`Delete ${user.name}? This cannot be undone.`);
+  const confirmed = await confirmDeletion(user.name);
 
   if (!confirmed) {
     return;
@@ -124,11 +127,20 @@ async function handleDelete(userId: string): Promise<void> {
 
   const result = UserService.deleteUser(userId);
 
-  if (!handleResult(result, 'User deleted successfully.')) {
+  if (!result.success) {
+    feedbackErrors.value = [];
+    feedbackMessage.value = null;
+    await showError(result.errors.join(' ') || 'This user could not be deleted.');
     return;
   }
 
-  if (result.success && result.data.deletedCurrentUser) {
+  feedbackErrors.value = [];
+  feedbackMessage.value = null;
+  isFormOpen.value = false;
+  editingUser.value = null;
+  await showSuccess('User deleted successfully.');
+
+  if (result.data.deletedCurrentUser) {
     await router.replace({ name: 'login' });
   }
 }
@@ -136,24 +148,16 @@ async function handleDelete(userId: string): Promise<void> {
 
 <template>
   <div class="admin-users-view">
-    <header class="view-header">
-      <div>
-        <h1>User management</h1>
-        <p>Create and manage the users authorized to access the dashboard.</p>
-      </div>
-      <button type="button" class="button-primary" @click="openCreateForm">Add user</button>
-    </header>
+    <PageHeader
+      title="User management"
+      description="Create and manage the users authorized to access the dashboard."
+    >
+      <template #actions>
+        <button type="button" class="button-primary" @click="openCreateForm">Add user</button>
+      </template>
+    </PageHeader>
 
-    <section v-if="feedbackErrors.length > 0" class="feedback-errors" role="alert">
-      <strong>The operation could not be completed:</strong>
-      <ul>
-        <li v-for="error in feedbackErrors" :key="error">{{ error }}</li>
-      </ul>
-    </section>
-
-    <p v-if="feedbackMessage" class="feedback-success" role="status">
-      {{ feedbackMessage }}
-    </p>
+    <OperationFeedback :errors="feedbackErrors" :success-message="feedbackMessage" />
 
     <UserFormPanel
       v-if="isFormOpen"
@@ -167,6 +171,7 @@ async function handleDelete(userId: string): Promise<void> {
       :columns="userColumns"
       :rows="userRows"
       row-key="id"
+      caption="User accounts, roles, and account dates"
       empty-message="No users are available."
     >
       <template #cell-role="{ value }">
@@ -208,23 +213,6 @@ async function handleDelete(userId: string): Promise<void> {
   gap: 1.5rem;
 }
 
-.view-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem;
-}
-
-.view-header h1 {
-  margin: 0 0 0.35rem;
-  color: #0f172a;
-}
-
-.view-header p {
-  margin: 0;
-  color: #64748b;
-}
-
 .button-primary {
   padding: 0.6rem 1.1rem;
   color: #ffffff;
@@ -239,29 +227,6 @@ async function handleDelete(userId: string): Promise<void> {
 
 .button-primary:hover {
   background-color: #1d4ed8;
-}
-
-.feedback-errors,
-.feedback-success {
-  margin: 0;
-  padding: 0.75rem 1rem;
-  font-size: 0.85rem;
-  border-radius: 0.5rem;
-}
-
-.feedback-errors {
-  color: #b91c1c;
-  background-color: #fee2e2;
-}
-
-.feedback-errors ul {
-  margin: 0.4rem 0 0;
-  padding-left: 1.25rem;
-}
-
-.feedback-success {
-  color: #166534;
-  background-color: #dcfce7;
 }
 
 .row-actions {
@@ -315,11 +280,5 @@ async function handleDelete(userId: string): Promise<void> {
   margin: 0;
   color: #64748b;
   font-size: 0.8rem;
-}
-
-@media (max-width: 640px) {
-  .view-header {
-    flex-direction: column;
-  }
 }
 </style>
