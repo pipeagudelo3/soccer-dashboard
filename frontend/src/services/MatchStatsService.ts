@@ -64,8 +64,8 @@ export class MatchStatsService {
 
     const candidatePayload: CreateMatchStatsDTO = {
       date: payload.date ?? existingMatchStats.date,
-      homeTeam: payload.homeTeam ?? existingMatchStats.homeTeam,
-      awayTeam: payload.awayTeam ?? existingMatchStats.awayTeam,
+      homeTeamId: payload.homeTeamId ?? existingMatchStats.homeTeamId,
+      awayTeamId: payload.awayTeamId ?? existingMatchStats.awayTeamId,
       goalsHomeTeam: payload.goalsHomeTeam ?? existingMatchStats.goalsHomeTeam,
       goalsAwayTeam: payload.goalsAwayTeam ?? existingMatchStats.goalsAwayTeam,
       stadium: payload.stadium ?? existingMatchStats.stadium,
@@ -114,8 +114,8 @@ export class MatchStatsService {
     const errors: string[] = [];
     const date = payload.date.trim();
     const stadium = payload.stadium.trim();
-    const homeTeam = TeamService.getTeamById(payload.homeTeam.id);
-    const awayTeam = TeamService.getTeamById(payload.awayTeam.id);
+    const homeTeam = TeamService.getTeamById(payload.homeTeamId);
+    const awayTeam = TeamService.getTeamById(payload.awayTeamId);
 
     if (!MatchStatsService.isValidIsoDate(date)) {
       errors.push('Enter a valid match date.');
@@ -157,8 +157,8 @@ export class MatchStatsService {
       errors: [],
       payload: {
         date,
-        homeTeam,
-        awayTeam,
+        homeTeamId: homeTeam.id,
+        awayTeamId: awayTeam.id,
         goalsHomeTeam: payload.goalsHomeTeam,
         goalsAwayTeam: payload.goalsAwayTeam,
         stadium,

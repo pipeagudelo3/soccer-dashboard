@@ -4,10 +4,16 @@ import { computed, ref } from 'vue';
 import ChartCard from '@/components/ChartCard.vue';
 import DataTable from '@/components/DataTable.vue';
 import FilterSelect from '@/components/FilterSelect.vue';
-import type { TeamInterface } from '@/interfaces/TeamInterface.js';
 import { MatchStatsService } from '@/services/MatchStatsService.js';
+import { TeamService } from '@/services/TeamService.js';
 
 const matchStats = computed(() => MatchStatsService.getMatchStats());
+const teams = computed(() => TeamService.getTeams());
+const teamsById = computed(() => new Map(teams.value.map((team) => [team.id, team])));
+
+function getTeamName(teamId: string): string {
+  return teamsById.value.get(teamId)?.name ?? 'Unknown team';
+}
 
 const teamFilter = ref('all');
 const stadiumFilter = ref('all');
@@ -15,18 +21,12 @@ const startDateFilter = ref('');
 const endDateFilter = ref('');
 
 const teamOptions = computed(() => {
-  const teams = new Map<string, string>();
-
-  for (const match of matchStats.value) {
-    teams.set(match.homeTeam.id, match.homeTeam.name);
-    teams.set(match.awayTeam.id, match.awayTeam.name);
-  }
-
   return [
     { label: 'All teams', value: 'all' },
-    ...[...teams.entries()]
-      .sort(([, firstName], [, secondName]) => firstName.localeCompare(secondName))
-      .map(([id, name]) => ({ label: name, value: id })),
+    ...teams.value
+      .slice()
+      .sort((firstTeam, secondTeam) => firstTeam.name.localeCompare(secondTeam.name))
+      .map((team) => ({ label: team.name, value: team.id })),
   ];
 });
 
@@ -43,8 +43,8 @@ const filteredMatchStats = computed(() =>
   matchStats.value.filter((match) => {
     const matchesTeam =
       teamFilter.value === 'all' ||
-      match.homeTeam.id === teamFilter.value ||
-      match.awayTeam.id === teamFilter.value;
+      match.homeTeamId === teamFilter.value ||
+      match.awayTeamId === teamFilter.value;
     const matchesStadium = stadiumFilter.value === 'all' || match.stadium === stadiumFilter.value;
     const matchesStartDate = startDateFilter.value === '' || match.date >= startDateFilter.value;
     const matchesEndDate = endDateFilter.value === '' || match.date <= endDateFilter.value;
@@ -77,8 +77,8 @@ const matchRows = computed(() =>
     .map((match) => ({
       id: match.id,
       date: dateFormatter.format(new Date(`${match.date}T00:00:00`)),
-      homeTeam: match.homeTeam.name,
-      awayTeam: match.awayTeam.name,
+      homeTeam: getTeamName(match.homeTeamId),
+      awayTeam: getTeamName(match.awayTeamId),
       score: `${match.goalsHomeTeam} - ${match.goalsAwayTeam}`,
       stadium: match.stadium,
       attendance: numberFormatter.format(match.attendance),
@@ -95,19 +95,20 @@ const goalsByTeamChart = computed(() => {
     }
   >();
 
-  function addGoals(team: TeamInterface, goals: number): void {
-    const currentTeam = goalsByTeamId.get(team.id);
+  function addGoals(teamId: string, goals: number): void {
+    const team = teamsById.value.get(teamId);
+    const currentTeam = goalsByTeamId.get(teamId);
 
-    goalsByTeamId.set(team.id, {
-      name: team.name,
-      country: team.country,
+    goalsByTeamId.set(teamId, {
+      name: team?.name ?? 'Unknown team',
+      country: team?.country ?? teamId,
       goals: (currentTeam?.goals ?? 0) + goals,
     });
   }
 
   for (const match of filteredMatchStats.value) {
-    addGoals(match.homeTeam, match.goalsHomeTeam);
-    addGoals(match.awayTeam, match.goalsAwayTeam);
+    addGoals(match.homeTeamId, match.goalsHomeTeam);
+    addGoals(match.awayTeamId, match.goalsAwayTeam);
   }
 
   const teamNameCounts = new Map<string, number>();

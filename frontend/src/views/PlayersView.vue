@@ -15,6 +15,7 @@ const authStore = useAuthStore();
 
 const players = ref<PlayerInterface[]>(PlayerService.getPlayers());
 const teams = computed(() => TeamService.getTeams());
+const teamNames = computed(() => new Map(teams.value.map((team) => [team.id, team.name])));
 
 const teamFilter = ref('all');
 const positionFilter = ref('all');
@@ -50,7 +51,7 @@ const filteredPlayers = computed(() =>
   players.value.filter((player) => {
     const matchesTeam =
       teamFilter.value === 'all' ||
-      (teamFilter.value === 'none' ? player.team === null : player.team?.id === teamFilter.value);
+      (teamFilter.value === 'none' ? player.teamId === null : player.teamId === teamFilter.value);
     const matchesPosition =
       positionFilter.value === 'all' || player.position === positionFilter.value;
     const matchesStatus = statusFilter.value === 'all' || player.status === statusFilter.value;
@@ -74,7 +75,10 @@ const playerRows = computed(() =>
   filteredPlayers.value.map((player) => ({
     id: player.id,
     name: player.name,
-    teamName: player.team?.name ?? 'Free agent',
+    teamName:
+      player.teamId === null
+        ? 'Free agent'
+        : (teamNames.value.get(player.teamId) ?? 'Unknown team'),
     position: player.position,
     status: player.status,
     goals: player.goals,

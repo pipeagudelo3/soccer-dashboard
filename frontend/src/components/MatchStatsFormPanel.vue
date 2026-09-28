@@ -54,8 +54,8 @@ watch(
 
     Object.assign(form, {
       date: matchStats.date,
-      homeTeamId: matchStats.homeTeam.id,
-      awayTeamId: matchStats.awayTeam.id,
+      homeTeamId: matchStats.homeTeamId,
+      awayTeamId: matchStats.awayTeamId,
       goalsHomeTeam: matchStats.goalsHomeTeam,
       goalsAwayTeam: matchStats.goalsAwayTeam,
       stadium: matchStats.stadium,
@@ -66,18 +66,18 @@ watch(
 );
 
 function handleSubmit(): void {
-  const homeTeam = props.teams.find((team) => team.id === form.homeTeamId);
-  const awayTeam = props.teams.find((team) => team.id === form.awayTeamId);
-
-  if (homeTeam === undefined || awayTeam === undefined) {
+  if (
+    !props.teams.some((team) => team.id === form.homeTeamId) ||
+    !props.teams.some((team) => team.id === form.awayTeamId)
+  ) {
     emit('invalid', ['Select an existing home team and away team.']);
     return;
   }
 
   const payload: CreateMatchStatsDTO = {
     date: form.date,
-    homeTeam,
-    awayTeam,
+    homeTeamId: form.homeTeamId,
+    awayTeamId: form.awayTeamId,
     goalsHomeTeam: form.goalsHomeTeam,
     goalsAwayTeam: form.goalsAwayTeam,
     stadium: form.stadium,

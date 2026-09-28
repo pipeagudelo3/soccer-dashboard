@@ -13,6 +13,11 @@ const authStore = useAuthStore();
 const teams = computed(() => TeamService.getTeams());
 const players = computed(() => PlayerService.getPlayers());
 const matchStats = computed(() => MatchStatsService.getMatchStats());
+const teamNames = computed(() => new Map(teams.value.map((team) => [team.id, team.name])));
+
+function getTeamName(teamId: string): string {
+  return teamNames.value.get(teamId) ?? 'Unknown team';
+}
 
 const totalGoalsScored = computed(() =>
   players.value.reduce((total, player) => total + player.goals, 0),
@@ -29,15 +34,15 @@ const goalsByTeamChart = computed(() => {
   const totals = new Map<string, number>();
 
   for (const player of players.value) {
-    if (player.team === null) {
+    if (player.teamId === null) {
       continue;
     }
 
-    totals.set(player.team.name, (totals.get(player.team.name) ?? 0) + player.goals);
+    totals.set(player.teamId, (totals.get(player.teamId) ?? 0) + player.goals);
   }
 
   return {
-    labels: [...totals.keys()],
+    labels: [...totals.keys()].map(getTeamName),
     datasets: [
       {
         label: 'Goals',
@@ -83,8 +88,8 @@ const matchRows = computed(() =>
     .map((match) => ({
       id: match.id,
       date: match.date,
-      homeTeam: match.homeTeam.name,
-      awayTeam: match.awayTeam.name,
+      homeTeam: getTeamName(match.homeTeamId),
+      awayTeam: getTeamName(match.awayTeamId),
       score: `${match.goalsHomeTeam} - ${match.goalsAwayTeam}`,
       stadium: match.stadium,
     })),

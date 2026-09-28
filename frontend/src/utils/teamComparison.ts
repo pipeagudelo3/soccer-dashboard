@@ -23,9 +23,9 @@ export function calculateTeamComparisonIndicators(
   players: PlayerInterface[],
   matchStats: MatchStatsInterface[],
 ): TeamComparisonIndicators {
-  const teamPlayers = players.filter((player) => player.team?.id === team.id);
+  const teamPlayers = players.filter((player) => player.teamId === team.id);
   const teamMatches = matchStats.filter(
-    (match) => match.homeTeam.id === team.id || match.awayTeam.id === team.id,
+    (match) => match.homeTeamId === team.id || match.awayTeamId === team.id,
   );
 
   let wins = 0;
@@ -36,7 +36,7 @@ export function calculateTeamComparisonIndicators(
   let totalAttendance = 0;
 
   for (const match of teamMatches) {
-    const isHomeTeam = match.homeTeam.id === team.id;
+    const isHomeTeam = match.homeTeamId === team.id;
     const teamGoals = isHomeTeam ? match.goalsHomeTeam : match.goalsAwayTeam;
     const opponentGoals = isHomeTeam ? match.goalsAwayTeam : match.goalsHomeTeam;
 

@@ -6,10 +6,6 @@ import type { UserInterface } from '@/interfaces/UserInterface.js';
 export const useUserStore = defineStore('users', () => {
   const users = ref<UserInterface[]>([]);
 
-  function setUsers(newUsers: UserInterface[]): void {
-    users.value = [...newUsers];
-  }
-
   function addUser(user: UserInterface): void {
     users.value = [...users.value, user];
   }
@@ -22,5 +18,5 @@ export const useUserStore = defineStore('users', () => {
     users.value = users.value.filter((user) => user.id !== userId);
   }
 
-  return { users, setUsers, addUser, updateUser, removeUser };
+  return { users, addUser, updateUser, removeUser };
 });
