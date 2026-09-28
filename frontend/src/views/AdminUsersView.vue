@@ -7,7 +7,8 @@ import UserFormPanel from '@/components/UserFormPanel.vue';
 import type { CreateUserDTO } from '@/dtos/CreateUserDTO.js';
 import type { UpdateUserDTO } from '@/dtos/UpdateUserDTO.js';
 import type { UserInterface } from '@/interfaces/UserInterface.js';
-import { UserService, type UserServiceResult } from '@/services/UserService.js';
+import type { ServiceResult } from '@/services/ServiceResult.js';
+import { UserService } from '@/services/UserService.js';
 import { useAuthStore } from '@/stores/authstore.js';
 
 const router = useRouter();
@@ -73,7 +74,7 @@ function closeForm(): void {
   feedbackErrors.value = [];
 }
 
-function handleResult(result: UserServiceResult, successMessage: string): boolean {
+function handleResult<T>(result: ServiceResult<T>, successMessage: string): boolean {
   if (!result.success) {
     feedbackErrors.value = result.errors;
     feedbackMessage.value = null;
@@ -127,7 +128,7 @@ async function handleDelete(userId: string): Promise<void> {
     return;
   }
 
-  if (result.deletedCurrentUser) {
+  if (result.success && result.data.deletedCurrentUser) {
     await router.replace({ name: 'login' });
   }
 }

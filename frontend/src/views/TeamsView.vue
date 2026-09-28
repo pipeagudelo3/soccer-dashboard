@@ -8,6 +8,7 @@ import TeamFormPanel from '@/components/TeamFormPanel.vue';
 import type { CreateTeamDTO } from '@/dtos/CreateTeamDTO.js';
 import type { TeamInterface } from '@/interfaces/TeamInterface.js';
 import { PlayerService } from '@/services/PlayerService.js';
+import type { ServiceResult } from '@/services/ServiceResult.js';
 import { TeamService } from '@/services/TeamService.js';
 import { useAuthStore } from '@/stores/authstore.js';
 
@@ -19,6 +20,7 @@ const players = computed(() => PlayerService.getPlayers());
 const countryFilter = ref('all');
 const isFormOpen = ref(false);
 const editingTeam = ref<TeamInterface | null>(null);
+const feedbackErrors = ref<string[]>([]);
 const feedbackMessage = ref<string | null>(null);
 
 const countryOptions = computed(() => {
@@ -81,6 +83,7 @@ function openCreateForm(): void {
   }
 
   editingTeam.value = null;
+  feedbackErrors.value = [];
   feedbackMessage.value = null;
   isFormOpen.value = true;
 }
@@ -91,8 +94,9 @@ function openEditForm(teamId: string): void {
   }
 
   editingTeam.value = TeamService.getTeamById(teamId) ?? null;
+  feedbackErrors.value = [];
   feedbackMessage.value = null;
-  isFormOpen.value = true;
+  isFormOpen.value = editingTeam.value !== null;
 }
 
 function closeForm(): void {
@@ -100,15 +104,27 @@ function closeForm(): void {
   editingTeam.value = null;
 }
 
-function handleSubmit(payload: CreateTeamDTO): void {
-  if (editingTeam.value === null) {
-    TeamService.createTeam(payload);
-  } else {
-    TeamService.updateTeam(editingTeam.value.id, payload);
+function handleResult<T>(result: ServiceResult<T>, successMessage: string): boolean {
+  if (!result.success) {
+    feedbackErrors.value = result.errors;
+    feedbackMessage.value = null;
+    return false;
   }
 
+  feedbackErrors.value = [];
+  feedbackMessage.value = successMessage;
   refreshTeams();
   closeForm();
+  return true;
+}
+
+function handleSubmit(payload: CreateTeamDTO): void {
+  if (editingTeam.value === null) {
+    handleResult(TeamService.createTeam(payload), 'Team created successfully.');
+    return;
+  }
+
+  handleResult(TeamService.updateTeam(editingTeam.value.id, payload), 'Team updated successfully.');
 }
 
 function handleDelete(teamId: string): void {
@@ -125,13 +141,7 @@ function handleDelete(teamId: string): void {
 
   const result = TeamService.deleteTeam(teamId);
 
-  if (!result.success) {
-    feedbackMessage.value = result.message ?? 'This team could not be deleted.';
-    return;
-  }
-
-  feedbackMessage.value = null;
-  refreshTeams();
+  handleResult(result, 'Team deleted successfully.');
 }
 </script>
 
@@ -147,7 +157,14 @@ function handleDelete(teamId: string): void {
       </button>
     </header>
 
-    <p v-if="feedbackMessage" class="feedback-message" role="alert">{{ feedbackMessage }}</p>
+    <section v-if="feedbackErrors.length > 0" class="feedback-errors" role="alert">
+      <strong>The operation could not be completed:</strong>
+      <ul>
+        <li v-for="error in feedbackErrors" :key="error">{{ error }}</li>
+      </ul>
+    </section>
+
+    <p v-if="feedbackMessage" class="feedback-success" role="status">{{ feedbackMessage }}</p>
 
     <TeamFormPanel
       v-if="isFormOpen"
@@ -228,13 +245,27 @@ function handleDelete(teamId: string): void {
   background-color: #1d4ed8;
 }
 
-.feedback-message {
+.feedback-errors,
+.feedback-success {
   margin: 0;
-  padding: 0.6rem 0.75rem;
-  color: #b91c1c;
+  padding: 0.75rem 1rem;
   font-size: 0.85rem;
-  background-color: #fee2e2;
   border-radius: 0.5rem;
+}
+
+.feedback-errors {
+  color: #b91c1c;
+  background-color: #fee2e2;
+}
+
+.feedback-errors ul {
+  margin: 0.4rem 0 0;
+  padding-left: 1.25rem;
+}
+
+.feedback-success {
+  color: #166534;
+  background-color: #dcfce7;
 }
 
 .filters-bar {

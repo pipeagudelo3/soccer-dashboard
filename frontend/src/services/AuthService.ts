@@ -1,12 +1,18 @@
 import type { LoginDTO } from '@/dtos/LoginDTO.js';
 import type { AuthenticatedUserInterface } from '@/interfaces/AuthenticatedUserInterface.js';
 import type { UserInterface } from '@/interfaces/UserInterface.js';
+import type { ServiceResult } from '@/services/ServiceResult.js';
 import { useAuthStore } from '@/stores/authstore.js';
 import { useUserStore } from '@/stores/userstore.js';
 
 export class AuthService {
-  static login(credentials: LoginDTO): boolean {
+  static login(credentials: LoginDTO): ServiceResult<AuthenticatedUserInterface> {
     const normalizedEmail = credentials.email.trim().toLowerCase();
+    const invalidCredentialsError = ['Invalid email or password.'];
+
+    if (normalizedEmail === '' || credentials.password.trim() === '') {
+      return { success: false, errors: invalidCredentialsError };
+    }
 
     const user = useUserStore().users.find(
       (storedUser) =>
@@ -15,12 +21,13 @@ export class AuthService {
     );
 
     if (user === undefined) {
-      return false;
+      return { success: false, errors: invalidCredentialsError };
     }
 
-    useAuthStore().setCurrentUser(AuthService.createAuthenticatedUser(user));
+    const authenticatedUser = AuthService.createAuthenticatedUser(user);
+    useAuthStore().setCurrentUser(authenticatedUser);
 
-    return true;
+    return { success: true, data: authenticatedUser };
   }
 
   static logout(): void {
@@ -45,6 +52,23 @@ export class AuthService {
     if (authStore.currentUser?.id === user.id) {
       authStore.setCurrentUser(AuthService.createAuthenticatedUser(user));
     }
+  }
+
+  static reconcileSession(): void {
+    const currentUser = useAuthStore().currentUser;
+
+    if (currentUser === null) {
+      return;
+    }
+
+    const storedUser = useUserStore().users.find((user) => user.id === currentUser.id);
+
+    if (storedUser === undefined) {
+      AuthService.logout();
+      return;
+    }
+
+    AuthService.synchronizeCurrentUser(storedUser);
   }
 
   private static createAuthenticatedUser(user: UserInterface): AuthenticatedUserInterface {

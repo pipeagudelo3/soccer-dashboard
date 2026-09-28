@@ -2,15 +2,10 @@ import type { CreateMatchStatsDTO } from '@/dtos/CreateMatchStatsDTO.js';
 import type { UpdateMatchStatsDTO } from '@/dtos/UpdateMatchStatsDTO.js';
 import type { MatchStatsInterface } from '@/interfaces/MatchStatsInterface.js';
 import { AuthService } from '@/services/AuthService.js';
+import type { ServiceResult } from '@/services/ServiceResult.js';
 import { TeamService } from '@/services/TeamService.js';
 import { useMatchStatsStore } from '@/stores/matchstatsstore.js';
 import { generateId } from '@/utils/generateId.js';
-
-export type MatchStatsServiceResult = {
-  success: boolean;
-  errors: string[];
-  matchStats?: MatchStatsInterface;
-};
 
 export class MatchStatsService {
   static getMatchStats(): MatchStatsInterface[] {
@@ -21,7 +16,7 @@ export class MatchStatsService {
     return useMatchStatsStore().matchStats.find((matchStats) => matchStats.id === id);
   }
 
-  static createMatchStats(payload: CreateMatchStatsDTO): MatchStatsServiceResult {
+  static createMatchStats(payload: CreateMatchStatsDTO): ServiceResult<MatchStatsInterface> {
     if (!AuthService.isAdmin()) {
       return {
         success: false,
@@ -45,10 +40,13 @@ export class MatchStatsService {
 
     useMatchStatsStore().addMatchStats(matchStats);
 
-    return { success: true, errors: [], matchStats };
+    return { success: true, data: matchStats };
   }
 
-  static updateMatchStats(id: string, payload: UpdateMatchStatsDTO): MatchStatsServiceResult {
+  static updateMatchStats(
+    id: string,
+    payload: UpdateMatchStatsDTO,
+  ): ServiceResult<MatchStatsInterface> {
     if (!AuthService.isAdmin()) {
       return {
         success: false,
@@ -71,7 +69,7 @@ export class MatchStatsService {
       stadium: payload.stadium ?? existingMatchStats.stadium,
       attendance: payload.attendance ?? existingMatchStats.attendance,
     };
-    const validatedPayload = MatchStatsService.validateAndNormalizePayload(candidatePayload);
+    const validatedPayload = MatchStatsService.validateAndNormalizePayload(candidatePayload, id);
 
     if (validatedPayload.errors.length > 0 || validatedPayload.payload === undefined) {
       return { success: false, errors: validatedPayload.errors };
@@ -85,10 +83,10 @@ export class MatchStatsService {
 
     useMatchStatsStore().updateMatchStats(updatedMatchStats);
 
-    return { success: true, errors: [], matchStats: updatedMatchStats };
+    return { success: true, data: updatedMatchStats };
   }
 
-  static deleteMatchStats(id: string): MatchStatsServiceResult {
+  static deleteMatchStats(id: string): ServiceResult<MatchStatsInterface> {
     if (!AuthService.isAdmin()) {
       return {
         success: false,
@@ -104,10 +102,13 @@ export class MatchStatsService {
 
     useMatchStatsStore().removeMatchStats(id);
 
-    return { success: true, errors: [] };
+    return { success: true, data: existingMatchStats };
   }
 
-  private static validateAndNormalizePayload(payload: CreateMatchStatsDTO): {
+  private static validateAndNormalizePayload(
+    payload: CreateMatchStatsDTO,
+    excludedMatchStatsId?: string,
+  ): {
     payload?: CreateMatchStatsDTO;
     errors: string[];
   } {
@@ -119,6 +120,8 @@ export class MatchStatsService {
 
     if (!MatchStatsService.isValidIsoDate(date)) {
       errors.push('Enter a valid match date.');
+    } else if (date > MatchStatsService.getCurrentIsoDate()) {
+      errors.push('Match date cannot be in the future.');
     }
 
     if (homeTeam === undefined) {
@@ -149,6 +152,17 @@ export class MatchStatsService {
       errors.push('Attendance must be a non-negative integer.');
     }
 
+    if (
+      MatchStatsService.matchExists(
+        date,
+        payload.homeTeamId,
+        payload.awayTeamId,
+        excludedMatchStatsId,
+      )
+    ) {
+      errors.push('Match statistics already exist for this date and pair of teams.');
+    }
+
     if (errors.length > 0 || homeTeam === undefined || awayTeam === undefined) {
       return { errors };
     }
@@ -168,7 +182,30 @@ export class MatchStatsService {
   }
 
   private static isNonNegativeInteger(value: number): boolean {
-    return Number.isInteger(value) && value >= 0;
+    return Number.isFinite(value) && Number.isInteger(value) && value >= 0;
+  }
+
+  private static matchExists(
+    date: string,
+    homeTeamId: string,
+    awayTeamId: string,
+    excludedMatchStatsId?: string,
+  ): boolean {
+    return useMatchStatsStore().matchStats.some(
+      (matchStats) =>
+        matchStats.id !== excludedMatchStatsId &&
+        matchStats.date === date &&
+        matchStats.homeTeamId === homeTeamId &&
+        matchStats.awayTeamId === awayTeamId,
+    );
+  }
+
+  private static getCurrentIsoDate(): string {
+    const currentDate = new Date();
+    const year = currentDate.getFullYear();
+    const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+    const day = String(currentDate.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   }
 
   private static isValidIsoDate(value: string): boolean {

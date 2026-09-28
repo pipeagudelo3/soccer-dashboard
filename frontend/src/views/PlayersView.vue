@@ -8,6 +8,7 @@ import PlayerFormPanel from '@/components/PlayerFormPanel.vue';
 import type { CreatePlayerDTO } from '@/dtos/CreatePlayerDTO.js';
 import type { PlayerInterface } from '@/interfaces/PlayerInterface.js';
 import { PlayerService } from '@/services/PlayerService.js';
+import type { ServiceResult } from '@/services/ServiceResult.js';
 import { TeamService } from '@/services/TeamService.js';
 import { useAuthStore } from '@/stores/authstore.js';
 
@@ -24,6 +25,8 @@ const nameSearch = ref('');
 
 const isFormOpen = ref(false);
 const editingPlayer = ref<PlayerInterface | null>(null);
+const feedbackErrors = ref<string[]>([]);
+const feedbackMessage = ref<string | null>(null);
 
 const teamOptions = computed(() => [
   { label: 'All teams', value: 'all' },
@@ -115,6 +118,8 @@ function openCreateForm(): void {
   }
 
   editingPlayer.value = null;
+  feedbackErrors.value = [];
+  feedbackMessage.value = null;
   isFormOpen.value = true;
 }
 
@@ -124,7 +129,9 @@ function openEditForm(playerId: string): void {
   }
 
   editingPlayer.value = PlayerService.getPlayerById(playerId) ?? null;
-  isFormOpen.value = true;
+  feedbackErrors.value = [];
+  feedbackMessage.value = null;
+  isFormOpen.value = editingPlayer.value !== null;
 }
 
 function closeForm(): void {
@@ -132,15 +139,30 @@ function closeForm(): void {
   editingPlayer.value = null;
 }
 
-function handleSubmit(payload: CreatePlayerDTO): void {
-  if (editingPlayer.value === null) {
-    PlayerService.createPlayer(payload);
-  } else {
-    PlayerService.updatePlayer(editingPlayer.value.id, payload);
+function handleResult<T>(result: ServiceResult<T>, successMessage: string): boolean {
+  if (!result.success) {
+    feedbackErrors.value = result.errors;
+    feedbackMessage.value = null;
+    return false;
   }
 
+  feedbackErrors.value = [];
+  feedbackMessage.value = successMessage;
   refreshPlayers();
   closeForm();
+  return true;
+}
+
+function handleSubmit(payload: CreatePlayerDTO): void {
+  if (editingPlayer.value === null) {
+    handleResult(PlayerService.createPlayer(payload), 'Player created successfully.');
+    return;
+  }
+
+  handleResult(
+    PlayerService.updatePlayer(editingPlayer.value.id, payload),
+    'Player updated successfully.',
+  );
 }
 
 function handleDelete(playerId: string): void {
@@ -157,8 +179,7 @@ function handleDelete(playerId: string): void {
     return;
   }
 
-  PlayerService.deletePlayer(playerId);
-  refreshPlayers();
+  handleResult(PlayerService.deletePlayer(playerId), 'Player deleted successfully.');
 }
 </script>
 
@@ -173,6 +194,15 @@ function handleDelete(playerId: string): void {
         Add player
       </button>
     </header>
+
+    <section v-if="feedbackErrors.length > 0" class="feedback-errors" role="alert">
+      <strong>The operation could not be completed:</strong>
+      <ul>
+        <li v-for="error in feedbackErrors" :key="error">{{ error }}</li>
+      </ul>
+    </section>
+
+    <p v-if="feedbackMessage" class="feedback-success" role="status">{{ feedbackMessage }}</p>
 
     <PlayerFormPanel
       v-if="isFormOpen"
@@ -258,6 +288,29 @@ function handleDelete(playerId: string): void {
 
 .button-primary:hover {
   background-color: #1d4ed8;
+}
+
+.feedback-errors,
+.feedback-success {
+  margin: 0;
+  padding: 0.75rem 1rem;
+  font-size: 0.85rem;
+  border-radius: 0.5rem;
+}
+
+.feedback-errors {
+  color: #b91c1c;
+  background-color: #fee2e2;
+}
+
+.feedback-errors ul {
+  margin: 0.4rem 0 0;
+  padding-left: 1.25rem;
+}
+
+.feedback-success {
+  color: #166534;
+  background-color: #dcfce7;
 }
 
 .filters-bar {

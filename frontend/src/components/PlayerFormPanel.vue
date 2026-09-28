@@ -114,11 +114,11 @@ function handleSubmit(): void {
       <div class="form-grid">
         <label>
           <span>Goals</span>
-          <input v-model.number="form.goals" type="number" min="0" required />
+          <input v-model.number="form.goals" type="number" min="0" step="1" required />
         </label>
         <label>
           <span>Assists</span>
-          <input v-model.number="form.assists" type="number" min="0" required />
+          <input v-model.number="form.assists" type="number" min="0" step="1" required />
         </label>
       </div>
     </fieldset>
