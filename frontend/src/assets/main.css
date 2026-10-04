@@ -16,6 +16,8 @@
   --color-success-background: #dcfce7;
   --space-feedback: 0.75rem 1rem;
   --section-gap: 4rem;
+  --header-height: 4.5rem;
+  --touch-target: 2.75rem;
 }
 
 *,
@@ -88,4 +90,25 @@ img {
   border: 0;
   clip: rect(0, 0, 0, 0);
   clip-path: inset(50%);
+}
+
+.skip-link {
+  position: fixed;
+  top: 0.5rem;
+  left: 0.5rem;
+  z-index: 100;
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch-target);
+  padding: 0.5rem 1rem;
+  color: var(--color-heading);
+  font-weight: 600;
+  text-decoration: none;
+  background-color: #ffffff;
+  border-radius: 0.5rem;
+  transform: translateY(-200%);
+}
+
+.skip-link:focus {
+  transform: translateY(0);
 }

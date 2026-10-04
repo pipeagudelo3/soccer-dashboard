@@ -1,21 +1,31 @@
 <script setup lang="ts">
 import { RouterView } from 'vue-router';
+import { ref } from 'vue';
 
 import AppHeader from '@/components/AppHeader.vue';
 import { useAuthStore } from '@/stores/authstore.js';
 
+const mainContent = ref<HTMLElement | null>(null);
 const authStore = useAuthStore();
+
+function focusMainContent(): void {
+  mainContent.value?.focus({ preventScroll: true });
+  mainContent.value?.scrollIntoView({ block: 'start' });
+}
 </script>
 
 <template>
   <div class="app-shell">
+    <a href="#main-content" class="skip-link" @click.prevent="focusMainContent">
+      Skip to main content
+    </a>
     <AppHeader
       :is-authenticated="authStore.isAuthenticated"
       :user-name="authStore.currentUser?.name ?? null"
       :user-role="authStore.currentUser?.role ?? null"
     />
 
-    <main class="main-content">
+    <main ref="mainContent" class="main-content" tabindex="-1">
       <RouterView />
     </main>
 
@@ -38,6 +48,11 @@ const authStore = useAuthStore();
   width: min(100% - 2rem, 1200px);
   margin: 0 auto;
   padding: 2rem 0;
+  scroll-margin-top: calc(var(--header-height) + 0.5rem);
+}
+
+.main-content:focus {
+  outline: none;
 }
 
 .app-footer {
