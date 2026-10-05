@@ -44,6 +44,17 @@ function parseCorsOrigins(value: string): string[] {
 }
 
 // Valida toda la configuración antes de que Nest abra el puerto del servidor.
+// Convierte la duración a segundos y limita el access token académico a una hora.
+export function getJwtExpirationSeconds(value: string): number {
+  const match = /^([1-9]\d*)([smh])$/.exec(value);
+  const unit = match?.[2];
+  const duration = Number(match?.[1]) * (unit === 'h' ? 3600 : unit === 'm' ? 60 : 1);
+  if (!match || !Number.isSafeInteger(duration) || duration < 1 || duration > 3600) {
+    throw new Error('JWT_EXPIRES_IN must be a positive duration between 1s and 1h.');
+  }
+  return duration;
+}
+
 // Los errores nombran la variable, pero nunca imprimen su valor ni el secreto.
 export function validateEnvironment(
   environment: Record<string, unknown>,
@@ -73,9 +84,7 @@ export function validateEnvironment(
 
   const jwtExpiresIn = readText(environment.JWT_EXPIRES_IN, 'JWT_EXPIRES_IN', '15m');
 
-  if (!/^[1-9]\d*[smh]$/.test(jwtExpiresIn)) {
-    throw new Error('JWT_EXPIRES_IN must be a positive duration such as 900s or 15m.');
-  }
+  getJwtExpirationSeconds(jwtExpiresIn);
 
   // Producción requiere una lista explícita; desarrollo y tests tienen defaults locales.
   const localOrigins = 'http://localhost:5173,http://127.0.0.1:5173';

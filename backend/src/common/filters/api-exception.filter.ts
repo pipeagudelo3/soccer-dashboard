@@ -1,18 +1,30 @@
-import { Catch, HttpException } from '@nestjs/common';
+import { Catch, HttpException, Logger } from '@nestjs/common';
 import type { ArgumentsHost, ExceptionFilter } from '@nestjs/common';
 import type { Request, Response } from 'express';
 
 import type { ApiErrorResponseDTO } from '../dto/api-error-response.dto.js';
+import { getSafeExceptionDetails } from './safe-exception-details.js';
 
 // Unifica fallos de guards, pipes y services; los inesperados reciben mensaje genérico.
 @Catch()
 export class ApiExceptionFilter implements ExceptionFilter {
+  private readonly logger = new Logger(ApiExceptionFilter.name);
+
   catch(exception: unknown, host: ArgumentsHost): void {
     const context = host.switchToHttp();
     const request = context.getRequest<Request>();
     const response = context.getResponse<Response>();
     const statusCode = exception instanceof HttpException ? exception.getStatus() : 500;
     let messages = ['Internal server error.'];
+
+    // Diagnostica el fallo original sin entregar al logger la excepción ni la petición.
+    if (statusCode >= 500) {
+      this.logger.error({
+        event: 'http_server_error',
+        statusCode,
+        ...getSafeExceptionDetails(exception),
+      });
+    }
 
     // Nunca serializa excepciones completas, SQL, cuerpos de solicitud o headers.
     if (exception instanceof HttpException && statusCode < 500) {

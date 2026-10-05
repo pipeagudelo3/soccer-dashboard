@@ -11,7 +11,7 @@ import type { AuthenticatedUserInterface } from '../auth/interfaces/authenticate
 import { User } from '../users/entities/user.entity.js';
 import { getSqliteErrorCode } from './sqlite-error-code.js';
 
-// Una cola compartida evita que Users y Teams abran transacciones simultáneas
+// Una cola compartida evita que los módulos CRUD abran transacciones simultáneas
 // sobre la misma conexión SQLite. No sustituye restricciones ni bloqueos de la DB.
 @Injectable()
 export class DatabaseWriteService {
