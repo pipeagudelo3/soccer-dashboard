@@ -1,0 +1,39 @@
+# Line-ending policy
+# Text files are stored with LF in the repository and checked out with LF on
+# every OS, regardless of each developer's core.autocrlf setting. Prettier
+# expects LF, so this keeps `npm run format:check` stable on Windows.
+* text=auto eol=lf
+
+# Source code, configuration and documentation: always text, always LF
+*.ts text eol=lf
+*.vue text eol=lf
+*.js text eol=lf
+*.cjs text eol=lf
+*.mjs text eol=lf
+*.css text eol=lf
+*.html text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.svg text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+.gitattributes text eol=lf
+.gitignore text eol=lf
+
+# Binary files: never transform them
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.avif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.eot binary
+*.pdf binary
+*.zip binary
+*.mp3 binary
+*.mp4 binary
