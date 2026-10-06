@@ -183,7 +183,11 @@ La cobertura unitaria publicada incluye los archivos declarados en jest.config.c
 
 Los archivos fuente tienen comentarios explicativos por bloque. JSON no admite comentarios: tsconfig configura el compilador, nest-cli.json configura el build Nest, package.json declara scripts/dependencias y .prettierrc.json contiene el formato compartido. El lockfile lo genera npm.
 
-No se modifica el frontend. La integración de Vue con estos datos corresponde a #50–#55. La base #40–#44 se revisa en `feature/backend-foundation` mediante el PR #62. El requisito #45 se desarrolla en `feature/backend-players-api` y #46 en `feature/backend-match-stats-api` y #47 en `feature/backend-jwt-auth`; esta entrega completa incluye las correcciones preparadas para la revisión del PR #62, que todavía deben publicarse allí. Registra solo las verificaciones ejecutadas. El contrato de arquitectura del issue #39 todavía requiere evidencia de revisión y aprobación del equipo; este README describe el comportamiento implementado y no representa esa aprobación.
+No se modifica el frontend. La integración de Vue con estos datos corresponde a #50–#55. La rama `feature/backend-foundation` (PR #62) contiene #40–#44; `feature/backend-jwt-auth` (PR #63) añade conjuntamente Players (#45), MatchStats (#46) y JWT (#47).
+
+El flujo de integración acordado para atender la revisión es publicar las correcciones de documentación y diagnóstico 5xx en #62, obtener la aprobación del equipo y fusionar primero ese PR. Después se actualizará `feature/backend-jwt-auth` incorporando el nuevo `main`, se comprobará que el diff del #63 contenga únicamente #45–#47 y sus ajustes indispensables, y se ejecutará de nuevo `npm run verify`. No se deben fusionar ambos PR con el mismo alcance duplicado. Mientras #62 permanezca abierto, el diff del #63 contra `main` incluye también su base; esto no significa que la separación o el merge ya hayan ocurrido.
+
+El contrato de arquitectura del issue #39 requiere que el equipo registre expresamente su aprobación o decisión antes de integrar los módulos dependientes. Este README describe el comportamiento implementado y no representa esa aprobación. Las descripciones de cada PR deben registrar únicamente verificaciones efectivamente ejecutadas y sus referencias de cierre.
 
 ## 9. Seed académico e idempotencia
 
@@ -212,31 +216,31 @@ Estas credenciales son públicas y exclusivamente de evaluación local. Los pass
 
 Todos los identificadores de las rutas de dominio son UUID v4. Un ID mal formado devuelve 400; uno válido inexistente devuelve 404. Las listas devuelven arrays completos, sin paginación.
 
-| Método | Ruta                 | Acceso                                      | Éxito          |
-| ------ | -------------------- | ------------------------------------------- | -------------- |
-| GET    | /api/health          | Público                                     | 200            |
-| POST   | /api/auth/login      | Público                                     | 200            |
-| GET    | /api/auth/me         | Usuario autenticado                         | 200            |
-| GET    | /api/users           | Administrador                               | 200            |
-| GET    | /api/users/:id       | Administrador, también para consulta propia | 200            |
-| POST   | /api/users           | Administrador                               | 201            |
-| PATCH  | /api/users/:id       | Administrador                               | 200            |
-| DELETE | /api/users/:id       | Administrador                               | 204 sin cuerpo |
-| GET    | /api/teams           | Usuario autenticado                         | 200            |
-| GET    | /api/teams/:id       | Usuario autenticado                         | 200            |
-| POST   | /api/teams           | Administrador                               | 201            |
-| PATCH  | /api/teams/:id       | Administrador                               | 200            |
-| DELETE | /api/teams/:id       | Administrador                               | 204 sin cuerpo |
-| GET    | /api/players         | Usuario autenticado                         | 200            |
-| GET    | /api/players/:id     | Usuario autenticado                         | 200            |
-| POST   | /api/players         | Administrador                               | 201            |
-| PATCH  | /api/players/:id     | Administrador                               | 200            |
-| DELETE | /api/players/:id     | Administrador                               | 204 sin cuerpo |
-| GET    | /api/match-stats     | Usuario autenticado                         | 200            |
-| GET    | /api/match-stats/:id | Usuario autenticado                         | 200            |
-| POST   | /api/match-stats     | Administrador                               | 201            |
-| PATCH  | /api/match-stats/:id | Administrador                               | 200            |
-| DELETE | /api/match-stats/:id | Administrador                               | 204 sin cuerpo |
+| Método | Ruta                 | Acceso              | Éxito          |
+| ------ | -------------------- | ------------------- | -------------- |
+| GET    | /api/health          | Público             | 200            |
+| POST   | /api/auth/login      | Público             | 200            |
+| GET    | /api/auth/me         | Usuario autenticado | 200            |
+| GET    | /api/users           | Administrador       | 200            |
+| GET    | /api/users/:id       | Administrador       | 200            |
+| POST   | /api/users           | Administrador       | 201            |
+| PATCH  | /api/users/:id       | Administrador       | 200            |
+| DELETE | /api/users/:id       | Administrador       | 204 sin cuerpo |
+| GET    | /api/teams           | Usuario autenticado | 200            |
+| GET    | /api/teams/:id       | Usuario autenticado | 200            |
+| POST   | /api/teams           | Administrador       | 201            |
+| PATCH  | /api/teams/:id       | Administrador       | 200            |
+| DELETE | /api/teams/:id       | Administrador       | 204 sin cuerpo |
+| GET    | /api/players         | Usuario autenticado | 200            |
+| GET    | /api/players/:id     | Usuario autenticado | 200            |
+| POST   | /api/players         | Administrador       | 201            |
+| PATCH  | /api/players/:id     | Administrador       | 200            |
+| DELETE | /api/players/:id     | Administrador       | 204 sin cuerpo |
+| GET    | /api/match-stats     | Usuario autenticado | 200            |
+| GET    | /api/match-stats/:id | Usuario autenticado | 200            |
+| POST   | /api/match-stats     | Administrador       | 201            |
+| PATCH  | /api/match-stats/:id | Administrador       | 200            |
+| DELETE | /api/match-stats/:id | Administrador       | 204 sin cuerpo |
 
 Envía `Authorization: Bearer <JWT>` en las rutas protegidas. El JWT debe estar firmado con el secreto configurado e identificar un usuario existente mediante `sub`. Sin token válido se devuelve 401; un usuario sin permiso administrativo recibe 403. POST `/api/auth/login` emite los tokens y GET `/api/auth/me` devuelve el perfil vigente. El frontend todavía no consume esta API.
 
