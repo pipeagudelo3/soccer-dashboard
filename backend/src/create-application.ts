@@ -9,7 +9,10 @@ import type { EnvironmentConfiguration } from './config/environment.js';
 
 // Permite reutilizar en e2e exactamente la misma inicialización que en producción.
 export async function createApplication(): Promise<INestApplication> {
-  const application = await NestFactory.create(AppModule, { logger: false, abortOnError: false });
+  const application = await NestFactory.create(AppModule, {
+    logger: ['error', 'warn', 'log'],
+    abortOnError: false,
+  });
   const configuration = application.get(ConfigService<EnvironmentConfiguration, true>);
 
   // Mantiene la API bajo /api y restringe CORS a los orígenes validados.
