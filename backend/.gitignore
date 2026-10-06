@@ -1,0 +1,19 @@
+# Dependencias y resultados generados; el lockfile sí se versiona.
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Configuración privada; conserva el ejemplo de configuración.
+.env
+.env.*
+!.env.example
+
+# Bases locales y archivos auxiliares de SQLite.
+data/
+*.sqlite
+*.sqlite-*
+*.db
+
+# Diagnósticos locales.
+*.log

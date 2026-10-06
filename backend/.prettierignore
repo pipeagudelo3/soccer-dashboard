@@ -1,0 +1,8 @@
+# Excluye dependencias, archivos generados y configuración local.
+node_modules/
+dist/
+coverage/
+package-lock.json
+.env
+.env.local
+data/
