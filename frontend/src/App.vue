@@ -25,7 +25,7 @@ function focusMainContent(): void {
       :user-role="authStore.currentUser?.role ?? null"
     />
 
-    <main ref="mainContent" class="main-content" tabindex="-1">
+    <main id="main-content" ref="mainContent" class="main-content" tabindex="-1">
       <RouterView />
     </main>
 
@@ -49,10 +49,6 @@ function focusMainContent(): void {
   margin: 0 auto;
   padding: 2rem 0;
   scroll-margin-top: calc(var(--header-height) + 0.5rem);
-}
-
-.main-content:focus {
-  outline: none;
 }
 
 .app-footer {
