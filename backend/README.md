@@ -185,7 +185,7 @@ Los archivos fuente tienen comentarios explicativos por bloque. JSON no admite c
 
 No se modifica el frontend. La integración de Vue con estos datos corresponde a #50–#55. La rama `feature/backend-foundation` (PR #62) contiene #40–#44; `feature/backend-jwt-auth` (PR #63) añade conjuntamente Players (#45), MatchStats (#46) y JWT (#47).
 
-El flujo de integración acordado para atender la revisión es publicar las correcciones de documentación y diagnóstico 5xx en #62, obtener la aprobación del equipo y fusionar primero ese PR. Después se actualizará `feature/backend-jwt-auth` incorporando el nuevo `main`, se comprobará que el diff del #63 contenga únicamente #45–#47 y sus ajustes indispensables, y se ejecutará de nuevo `npm run verify`. No se deben fusionar ambos PR con el mismo alcance duplicado. Mientras #62 permanezca abierto, el diff del #63 contra `main` incluye también su base; esto no significa que la separación o el merge ya hayan ocurrido.
+El PR #62 fue fusionado en main mediante el commit a5a5492. Esta rama incorpora esa base y conserva Players (#45), MatchStats (#46), JWT (#47) y sus ajustes asociados. Antes de publicar la actualización del PR #63, se revisará el diff contra main y se ejecutará nuevamente npm run verify.
 
 El contrato de arquitectura del issue #39 requiere que el equipo registre expresamente su aprobación o decisión antes de integrar los módulos dependientes. Este README describe el comportamiento implementado y no representa esa aprobación. Las descripciones de cada PR deben registrar únicamente verificaciones efectivamente ejecutadas y sus referencias de cierre.
 
