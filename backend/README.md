@@ -185,9 +185,9 @@ Los archivos fuente tienen comentarios explicativos por bloque. JSON no admite c
 
 No se modifica el frontend. La integración de Vue con estos datos corresponde a #50–#55. La rama `feature/backend-foundation` (PR #62) contiene #40–#44; `feature/backend-jwt-auth` (PR #63) añade conjuntamente Players (#45), MatchStats (#46) y JWT (#47).
 
-El PR #62 fue fusionado en main mediante el commit a5a5492. Esta rama incorpora esa base y conserva Players (#45), MatchStats (#46), JWT (#47) y sus ajustes asociados. Antes de publicar la actualización del PR #63, se revisará el diff contra main y se ejecutará nuevamente npm run verify.
+El PR #62 fue fusionado en `main` mediante el commit `a5a5492`. La rama `feature/backend-jwt-auth` incorporó esa base mediante el commit `34dc0f4` y conserva Players (#45), MatchStats (#46), JWT (#47) y sus ajustes asociados. La actualización del PR #63 ya está publicada; se revisó el diff contra `main` y se ejecutó nuevamente `npm run verify` con 159 pruebas unitarias y 324 pruebas e2e aprobadas.
 
-El contrato de arquitectura del issue #39 requiere que el equipo registre expresamente su aprobación o decisión antes de integrar los módulos dependientes. Este README describe el comportamiento implementado y no representa esa aprobación. Las descripciones de cada PR deben registrar únicamente verificaciones efectivamente ejecutadas y sus referencias de cierre.
+El contrato de arquitectura y API REST del Entregable 2, compartido por frontend y backend, fue revisado y aprobado por el arquitecto delegado por el equipo. El issue #39 está cerrado y la [aprobación quedó registrada](https://github.com/pipeagudelo3/soccer-dashboard/issues/39#issuecomment-6017703122). El equipo ratificó las decisiones actuales después de que comenzara la implementación; cualquier modificación futura requiere un nuevo acuerdo documentado. Las descripciones de cada PR deben registrar únicamente verificaciones efectivamente ejecutadas y sus referencias de cierre.
 
 ## 9. Seed académico e idempotencia
 
@@ -294,7 +294,7 @@ El modelo aprobado User no tiene un campo enabled/disabled. Por ello no existe u
 
 ### Decisión de sesión para la SPA académica
 
-Durante la integración, el access token se conservará únicamente en memoria del servicio/store de autenticación de la pestaña. Debe excluirse del mecanismo de persistencia Pinia actual: no guardarlo en LocalStorage, SessionStorage, URLs o archivos. Recargar la página requiere iniciar sesión otra vez. Las peticiones usan Authorization: Bearer y, al recibir 401 o alcanzar expiresIn, el frontend limpia la sesión y dirige a login. Un logout local elimina el token en memoria; no revoca por sí mismo una copia del token antes de expirar. No se implementan refresh tokens ni un endpoint de logout en este requisito. Cambiar una contraseña afecta el siguiente login, pero los access tokens ya emitidos siguen vigentes hasta expirar salvo eliminación de la cuenta. Esta política está documentada; la adaptación del frontend sigue pendiente y el contrato #39 continúa necesitando confirmación del equipo.
+Durante la integración, el access token se conservará únicamente en memoria del servicio/store de autenticación de la pestaña. Debe excluirse del mecanismo de persistencia Pinia actual: no guardarlo en LocalStorage, SessionStorage, URLs o archivos. Recargar la página requiere iniciar sesión otra vez. Las peticiones usan Authorization: Bearer y, al recibir 401 o alcanzar expiresIn, el frontend limpia la sesión y dirige a login. Un logout local elimina el token en memoria; no revoca por sí mismo una copia del token antes de expirar. No se implementan refresh tokens ni un endpoint de logout en este requisito. Cambiar una contraseña afecta el siguiente login, pero los access tokens ya emitidos siguen vigentes hasta expirar salvo eliminación de la cuenta. Esta política forma parte del contrato aprobado en #39; la adaptación del frontend sigue pendiente de los requisitos de integración.
 
 ### Prueba desde PowerShell
 
