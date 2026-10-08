@@ -3,14 +3,25 @@
 // that view stays responsible for listing, filtering, and orchestration only.
 import { reactive, watch } from 'vue';
 
+import OperationFeedback from '@/components/OperationFeedback.vue';
+
 import type { CreateTeamDTO } from '@/dtos/CreateTeamDTO.js';
 import type { TeamInterface } from '@/interfaces/TeamInterface.js';
 
 interface Props {
+  isSubmitting?: boolean;
+  isDisabled?: boolean;
+  isStale?: boolean;
+  errors?: string[];
   editingTeam: TeamInterface | null;
 }
 
-const props = defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), {
+  isSubmitting: false,
+  isDisabled: false,
+  isStale: false,
+  errors: () => [],
+});
 
 const emit = defineEmits<{
   submit: [payload: CreateTeamDTO];
@@ -32,50 +43,103 @@ const form = reactive<CreateTeamDTO>(createEmptyForm());
 watch(
   () => props.editingTeam,
   (team) => {
-    Object.assign(form, team === null ? createEmptyForm() : { ...team });
+    Object.assign(
+      form,
+      team === null
+        ? createEmptyForm()
+        : {
+            name: team.name,
+            logoURL: team.logoURL,
+            country: team.country,
+            stadium: team.stadium,
+            foundedDate: team.foundedDate,
+          },
+    );
   },
   { immediate: true },
 );
 
 function handleSubmit(): void {
+  if (props.isSubmitting || props.isDisabled || props.isStale) return;
   emit('submit', { ...form });
 }
 </script>
 
 <template>
-  <form class="team-form" @submit.prevent="handleSubmit">
+  <form class="team-form" :aria-busy="props.isSubmitting" @submit.prevent="handleSubmit">
     <h3>{{ props.editingTeam === null ? 'Create team' : 'Edit team' }}</h3>
 
+    <OperationFeedback :errors="props.errors" />
+    <p v-if="props.isStale" role="alert">
+      This record no longer exists. Cancel editing and reload the list.
+    </p>
     <div class="form-grid">
       <label>
         <span>Name</span>
-        <input v-model="form.name" type="text" required />
+        <input
+          :disabled="props.isSubmitting || props.isDisabled || props.isStale"
+          v-model="form.name"
+          type="text"
+          required
+        />
       </label>
 
       <label>
         <span>Country</span>
-        <input v-model="form.country" type="text" required />
+        <input
+          :disabled="props.isSubmitting || props.isDisabled || props.isStale"
+          v-model="form.country"
+          type="text"
+          required
+        />
       </label>
 
       <label>
         <span>Stadium</span>
-        <input v-model="form.stadium" type="text" required />
+        <input
+          :disabled="props.isSubmitting || props.isDisabled || props.isStale"
+          v-model="form.stadium"
+          type="text"
+          required
+        />
       </label>
 
       <label>
         <span>Founded date</span>
-        <input v-model="form.foundedDate" type="date" required />
+        <input
+          :disabled="props.isSubmitting || props.isDisabled || props.isStale"
+          v-model="form.foundedDate"
+          type="date"
+          required
+        />
       </label>
 
       <label class="form-grid-full">
         <span>Logo URL</span>
-        <input v-model="form.logoURL" type="url" placeholder="https://..." required />
+        <input
+          :disabled="props.isSubmitting || props.isDisabled || props.isStale"
+          v-model="form.logoURL"
+          type="url"
+          placeholder="https://..."
+          required
+        />
       </label>
     </div>
 
     <div class="form-actions">
-      <button type="button" class="button-secondary" @click="emit('cancel')">Cancel</button>
-      <button type="submit" class="button-primary">
+      <button
+        type="button"
+        class="button-secondary"
+        :disabled="props.isSubmitting"
+        @click="emit('cancel')"
+      >
+        Cancel
+      </button>
+      <button
+        type="submit"
+        class="button-primary"
+        :disabled="props.isSubmitting || props.isDisabled || props.isStale"
+      >
         {{ props.editingTeam === null ? 'Create team' : 'Save changes' }}
       </button>
     </div>

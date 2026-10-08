@@ -2,16 +2,14 @@
 import { computed } from 'vue';
 import { RouterLink } from 'vue-router';
 
-import { MatchStatsService } from '@/services/MatchStatsService.js';
-import { PlayerService } from '@/services/PlayerService.js';
-import { TeamService } from '@/services/TeamService.js';
+import ApiLoadState from '@/components/ApiLoadState.vue';
+import { useTeamPlayerData } from '@/composables/useTeamPlayerData.js';
 import { useAuthStore } from '@/stores/authstore.js';
 
-const authStore = useAuthStore();
+const { teams, players, matchStats, isLoading, hasLoaded, loadErrors, isReady, loadData } =
+  useTeamPlayerData(true);
 
-const teams = computed(() => TeamService.getTeams());
-const players = computed(() => PlayerService.getPlayers());
-const matchStats = computed(() => MatchStatsService.getMatchStats());
+const authStore = useAuthStore();
 
 const summaryCards = computed(() => [
   { label: 'Teams', value: teams.value.length },
@@ -40,25 +38,36 @@ const summaryCards = computed(() => [
       </div>
     </section>
 
-    <section class="summary-grid">
-      <article v-for="card in summaryCards" :key="card.label" class="summary-card">
-        <span class="summary-value">{{ card.value }}</span>
-        <span class="summary-label">{{ card.label }}</span>
-      </article>
-    </section>
-
-    <section class="teams-preview">
-      <h2>Featured teams</h2>
-      <div class="teams-grid">
-        <article v-for="team in teams" :key="team.id" class="team-card">
-          <img :src="team.logoURL" :alt="`${team.name} logo`" class="team-logo" />
-          <div>
-            <strong>{{ team.name }}</strong>
-            <p>{{ team.country }} &middot; {{ team.stadium }}</p>
-          </div>
+    <p v-if="!authStore.isAuthenticated">Log in to view current teams and season statistics.</p>
+    <ApiLoadState
+      v-else
+      :is-loading="isLoading"
+      :errors="loadErrors"
+      :has-loaded="hasLoaded"
+      :is-empty="teams.length === 0"
+      @retry="loadData"
+    />
+    <template v-if="isReady">
+      <section class="summary-grid">
+        <article v-for="card in summaryCards" :key="card.label" class="summary-card">
+          <span class="summary-value">{{ card.value }}</span>
+          <span class="summary-label">{{ card.label }}</span>
         </article>
-      </div>
-    </section>
+      </section>
+
+      <section class="teams-preview">
+        <h2>Featured teams</h2>
+        <div class="teams-grid">
+          <article v-for="team in teams" :key="team.id" class="team-card">
+            <img :src="team.logoURL" :alt="`${team.name} logo`" class="team-logo" />
+            <div>
+              <strong>{{ team.name }}</strong>
+              <p>{{ team.country }} &middot; {{ team.stadium }}</p>
+            </div>
+          </article>
+        </div>
+      </section>
+    </template>
   </div>
 </template>
 

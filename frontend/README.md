@@ -71,7 +71,7 @@ variable after the build does not rewrite the bundle. `.env` and local/mode file
 
 Domain services call the typed `ApiService.request<T>()` and receive the existing
 `ServiceResult<T>` (`success/data` or `success/errors`). Axios stays inside the transport services,
-not in views or components. For example, a future Teams service can request:
+not in views or components. For example, TeamService reads through the shared client:
 
 ```ts
 const result = await ApiService.request<TeamInterface[]>({ url: '/teams' });
@@ -100,9 +100,10 @@ predictable presentation messages. Raw Axios errors, request bodies, tokens and 
 are never logged or returned by these services. Server errors remain generic.
 
 The shared transport layer is implemented in #50, backend login/session handling in #51 and Users
-administration in #52. Teams, Players and MatchStats CRUD remain local until their integration
-requirements are completed. Users administration reads and writes only the backend database. The runtime login requires the backend
-JWT module (#47, PR #63); the client uses the approved #39 contract.
+administration in #52. Teams and Players reads/CRUD use the backend in #53. Charts, comparison and
+match-statistics browsing read recorded backend matches to join the same UUID relationships.
+MatchStats administration remains local until its own migration. Runtime login requires backend
+JWT (#47, PR #63); the client uses the approved #39 contract.
 
 ### HTTP client tests
 
@@ -145,8 +146,8 @@ an account after logout or replace a newer login.
 
 ### Refresh and the approved memory-only contract
 
-A full browser reload discards the token. The frontend ignores all persisted auth fields, preserves
-domain data and returns to login when a protected page is requested. It does not recreate a session
+A full browser reload discards the token. The frontend ignores persisted backend-owned domain
+state, preserves only the remaining local match-administration state and returns to login when a protected page is requested. It does not recreate a session
 from a saved profile, LocalStorage or SessionStorage. This interprets the issue's refresh criterion
 under the approved #39 decision: there is no persistent login across a full reload. If an in-memory
 token is available during SPA navigation/reconciliation, it is accepted only after `/auth/me`.
@@ -184,8 +185,8 @@ before sending, so IDs, timestamps and arbitrary properties are not writable.
 
 The page uses the `useUserAdministration` composable for ephemeral loading, list, form and feedback
 state. It never reads the local user domain store or browser storage. Pinia configuration ignores
-and excludes both auth and users from active persisted snapshots, preserves the remaining local
-domains, and no longer runs the local user seeder. The old user store/seeder files remain only for
+and excludes auth, users, teams and players from active persisted snapshots and preserves only the
+remaining local match domain. It no longer runs the local user/team/player seeders. The old user store/seeder files remain only for
 legacy compatibility; they are not used by backend administration, and the fictional seeder no
 longer contains password fields. Existing legacy migration backups are not used as a Users database.
 
@@ -214,8 +215,8 @@ A successful write is not reported as failed merely because a later profile chec
 
 ### Validation and manual evaluation
 
-`npm run verify` includes 80 tests: 24 transport, 23 authentication/navigation and 33 Users service,
-page-state and form-rendering tests. They cover DTO serialization, safe responses, permissions,
+`npm run verify` includes transport, authentication/navigation, Users administration and
+Teams/Players integration tests. The 33 Users service, page-state and form-rendering tests cover DTO serialization, safe responses, permissions,
 validation/conflicts, loading/retry/empty states, stale records, races, self-update/self-delete,
 legacy snapshot exclusion and preservation of inline form feedback. Test Vite servers disable
 HMR/WebSocket because no browser hot reload is needed; parallel files no longer compete for port 24678. No dependency was added for this requirement.
@@ -234,6 +235,77 @@ backend must reject demotion/deletion. Sign in as a regular user and verify dire
 navigation is blocked. Keep the memory-only token rule from #39: a full reload requires login.
 These manual steps are provided for the contributor; automated and real API checks are recorded
 separately and do not claim a desktop-browser session was performed.
+
+## Backend Teams and Players — #53
+
+TeamsView and PlayersView use asynchronous TeamService and PlayerService operations through the
+same ApiService. GET collection/detail endpoints accept authenticated users; POST/PATCH/DELETE
+require an administrator in NestJS. Frontend checks keep the UI read-only for regular users and
+never replace backend guards. Opening an edit form fetches a fresh record; cancellation of the
+SweetAlert2 deletion dialog performs no HTTP request, including no preliminary GET.
+
+Team responses preserve eight public properties, and player responses preserve the normalized
+nine-property contract. Players keep only nullable `teamId`, never an embedded Team. Display names,
+filter options, squad counts, scorer charts and comparison results derive from server snapshots.
+The transport selects only writable DTO fields and reconstructs validated public responses,
+discarding unexpected fields. Uniqueness, approved status values, numbers, team existence and
+transactional deletion rules are enforced by the backend; local seeders and domain stores are not
+used to supply migrated features.
+
+`useTeamPlayerData` owns disposable page snapshots with atomic loading, empty/error/retry states.
+It does not persist an API cache. All required reads must succeed before charts/tables are shown,
+so a failed players request cannot masquerade as a zero-sized squad. Later loads supersede earlier
+ones; logout, a session switch or leaving the view prevents old responses from revealing data.
+Home remains accessible to guests and asks them to log in before displaying private API data.
+Dashboard, Statistics, MatchStats browsing and TeamComparison use asynchronous data as well.
+
+`useResourceAdministration` shares the two editors' pending/confirmation/save lifecycle. Validation
+and conflict feedback stays inside the open form without resetting its draft. Duplicate actions
+are blocked. Successful create/update uses normalized server responses without a page reload.
+404 removes a stale row; an open stale draft remains visible, blocks resubmission and can be
+canceled. A 403 refreshes the active role through `/auth/me`; a role downgrade closes write forms.
+401 relies on the existing session/navigation bridge. Network, 5xx and other status responses retain
+the common safe ServiceResult feedback.
+
+Deleting a team refetches both collections. NestJS may set associated players' `teamId` to null or
+reject deletion with 409 when recorded matches reference that team. No local team/player store is
+mutated to predict those outcomes. A successful DELETE remains successful even if its subsequent
+read fails; the loading error and retry action show that the refreshed snapshot is unavailable.
+Reloading and signing in again fetches the persisted database records.
+
+### Match-data transition
+
+RecordedMatchService provides **read-only** backend match snapshots for charts, statistics,
+comparison, Home/Dashboard summaries and MatchStats browsing. This small bridge is necessary for
+#53: backend team UUIDs cannot be joined with the old fictional match IDs. It introduces no match
+mutation API and does not complete the separate MatchStats administration requirement.
+
+AdminMatchStatsView still edits its legacy browser-local records. Its team selectors now await live
+teams; local create/update awaits that validation and blocks concurrent submits. The page clearly
+labels that these edits do not change database matches shown elsewhere. Old fictional team IDs
+are shown as unavailable rather than remapped by guessed names. MatchStats administration must be
+migrated in its own requirement before this temporary separation is removed.
+
+### Verification and evaluation
+
+Node 24.19.0 was used with `npm ci` and `npm run verify`. Automated tests cover real HTTP requests,
+public DTOs, permissions, nullable relationships, validation/conflicts, stale IDs, canceled deletes,
+loading/empty/retry, racing responses, role changes, duplicate actions, comparison joins and rendered
+form feedback. The previous #50–#52 tests remain in the verification suite. No package dependency,
+backend schema, migration or token-persistence policy changes in #53.
+
+A separate smoke check uses the actual NestJS application and isolated SQLite data to verify
+Teams/Players CRUD, normalization, validation 400, duplicate/conflict 409, 404, database player
+detachment, protected match relationships, comparison, regular-user direct API 403 and guest 401.
+It does not use fixtures to claim database integrity or cryptographic JWT verification.
+
+For manual evaluation, start the seeded backend and Vite. Login as admin, filter Teams by country
+and Players by team/free-agent, position, status and name; inspect both charts and comparison.
+Create/update a player and team, submit invalid values, cancel deletion, try deleting a team with
+recorded matches, and delete a newly created unreferenced team with a player. The player must become
+unassigned after the server operation. Reload/sign in again and confirm persisted data. With a
+regular account, both pages must be read-only. Stop the backend to inspect error/retry states and
+resume it before retrying. Automated checks do not claim a manual desktop-browser evaluation.
 
 ### Dependency audit at implementation time
 

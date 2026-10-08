@@ -1,19 +1,18 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 
+import ApiLoadState from '@/components/ApiLoadState.vue';
+import { useTeamPlayerData } from '@/composables/useTeamPlayerData.js';
 import ChartCard from '@/components/ChartCard.vue';
 import DataTable from '@/components/DataTable.vue';
 import PageHeader from '@/components/PageHeader.vue';
-import { MatchStatsService } from '@/services/MatchStatsService.js';
-import { PlayerService } from '@/services/PlayerService.js';
-import { TeamService } from '@/services/TeamService.js';
 import { useAuthStore } from '@/stores/authstore.js';
+
+const { teams, players, matchStats, isLoading, hasLoaded, loadErrors, isReady, loadData } =
+  useTeamPlayerData(true);
 
 const authStore = useAuthStore();
 
-const teams = computed(() => TeamService.getTeams());
-const players = computed(() => PlayerService.getPlayers());
-const matchStats = computed(() => MatchStatsService.getMatchStats());
 const teamNames = computed(() => new Map(teams.value.map((team) => [team.id, team.name])));
 
 function getTeamName(teamId: string): string {
@@ -103,40 +102,48 @@ const matchRows = computed(() =>
       title="Dashboard"
       :description="`Welcome back, ${authStore.currentUser?.name ?? 'user'}. Here is the current season overview.`"
     />
+    <ApiLoadState
+      :is-loading="isLoading"
+      :errors="loadErrors"
+      :has-loaded="hasLoaded"
+      :is-empty="teams.length === 0"
+      @retry="loadData"
+    />
+    <template v-if="isReady">
+      <section class="summary-grid">
+        <article v-for="card in summaryCards" :key="card.label" class="summary-card">
+          <span class="summary-value">{{ card.value }}</span>
+          <span class="summary-label">{{ card.label }}</span>
+        </article>
+      </section>
 
-    <section class="summary-grid">
-      <article v-for="card in summaryCards" :key="card.label" class="summary-card">
-        <span class="summary-value">{{ card.value }}</span>
-        <span class="summary-label">{{ card.label }}</span>
-      </article>
-    </section>
+      <section class="charts-grid">
+        <ChartCard
+          title="Goals by team"
+          description="Total goals scored by each team's roster this season."
+          type="bar"
+          :data="goalsByTeamChart"
+          :options="{ plugins: { legend: { display: false } } }"
+        />
+        <ChartCard
+          title="Players by position"
+          description="Distribution of the squad across playing positions."
+          type="doughnut"
+          :data="playersByPositionChart"
+        />
+      </section>
 
-    <section class="charts-grid">
-      <ChartCard
-        title="Goals by team"
-        description="Total goals scored by each team's roster this season."
-        type="bar"
-        :data="goalsByTeamChart"
-        :options="{ plugins: { legend: { display: false } } }"
-      />
-      <ChartCard
-        title="Players by position"
-        description="Distribution of the squad across playing positions."
-        type="doughnut"
-        :data="playersByPositionChart"
-      />
-    </section>
-
-    <section class="matches-section">
-      <h2>Latest matches</h2>
-      <DataTable
-        :columns="matchColumns"
-        :rows="matchRows"
-        row-key="id"
-        caption="Latest recorded match results"
-        empty-message="No matches recorded yet."
-      />
-    </section>
+      <section class="matches-section">
+        <h2>Latest matches</h2>
+        <DataTable
+          :columns="matchColumns"
+          :rows="matchRows"
+          row-key="id"
+          caption="Latest recorded match results"
+          empty-message="No matches recorded yet."
+        />
+      </section>
+    </template>
   </div>
 </template>
 
