@@ -11,13 +11,14 @@ interface ResourceOperations<T, Create, Update> {
   remove(id: string): Promise<ServiceResult<undefined>>;
 }
 
-// Shared editor lifecycle for Teams and Players; backend responses own validation and relationships.
-export function useResourceAdministration<T extends { id: string; name: string }, Create, Update>(
+// Shared editor lifecycle for backend resources; backend responses own validation and relationships.
+export function useResourceAdministration<T extends { id: string }, Create, Update>(
   records: Ref<T[]>,
   isLoading: Ref<boolean>,
   reload: () => Promise<void>,
   operations: ResourceOperations<T, Create, Update>,
   label: string,
+  recordLabel?: (record: T) => string,
 ) {
   const authStore = useAuthStore();
   const editingRecord = shallowRef<T | null>(null);
@@ -118,9 +119,15 @@ export function useResourceAdministration<T extends { id: string; name: string }
     clearFeedback();
     try {
       // Confirmation precedes every request, including any record refresh.
-      const confirmed = await confirm(
-        records.value.find((record) => record.id === id)?.name ?? `this ${label.toLowerCase()}`,
-      );
+      const record = records.value.find((candidate) => candidate.id === id);
+      const name =
+        record === undefined
+          ? `this ${label.toLowerCase()}`
+          : (recordLabel?.(record) ??
+            ('name' in record && typeof record.name === 'string'
+              ? record.name
+              : `this ${label.toLowerCase()}`));
+      const confirmed = await confirm(name);
       if (!current(token, requestVersion) || !authStore.isAdmin)
         return { success: false, errors: ['The session has changed.'] };
       if (!confirmed) return { success: true, data: false };

@@ -538,6 +538,7 @@ test('a late load cannot replace newer data', async () => {
   for (let count = 0; !release && count < 100; count++) await delay(2);
   assert.ok(release);
   teams = [team(secondId, 'New')];
+  players = [player(secondId)];
   await data.loadData();
   release();
   await delay(10);
@@ -706,7 +707,7 @@ test('a role downgrade closes an open write form while keeping read-only catalog
   assert.ok(editor.feedbackErrors.value.length > 0);
   assert.equal(data.isReady.value, true);
 });
-test('legacy team/player snapshots cannot hydrate an API page or prevent local match migration', async () => {
+test('legacy domain snapshots cannot hydrate an API page after REST migration', async () => {
   const persistence = (await vite.ssrLoadModule(
     '/src/PiniaConfig.ts',
   )) as typeof import('../src/PiniaConfig.js');
@@ -735,7 +736,7 @@ test('legacy team/player snapshots cannot hydrate an API page or prevent local m
     scope.run(() => persistence.configurePinia(pinia));
     assert.equal(pinia.state.value.teams, undefined);
     assert.equal(pinia.state.value.players, undefined);
-    assert.deepEqual(pinia.state.value.matchStats, { matchStats: [match] });
+    assert.equal(pinia.state.value.matchStats, undefined);
     assert.ok(!storage.getItem('piniaState')?.includes('old-local-team'));
     assert.ok(!storage.getItem('piniaState')?.includes('old-local-player'));
   } finally {

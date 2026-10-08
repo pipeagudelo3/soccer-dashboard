@@ -17,7 +17,7 @@ the project.
 ## Project setup
 
 ```sh
-npm install
+npm ci
 ```
 
 ## Development
@@ -102,7 +102,7 @@ are never logged or returned by these services. Server errors remain generic.
 The shared transport layer is implemented in #50, backend login/session handling in #51 and Users
 administration in #52. Teams and Players reads/CRUD use the backend in #53. Charts, comparison and
 match-statistics browsing read recorded backend matches to join the same UUID relationships.
-MatchStats administration remains local until its own migration. Runtime login requires backend
+MatchStats administration and analytical consumers now use the same backend in #54. Runtime login requires backend
 JWT (#47, PR #63); the client uses the approved #39 contract.
 
 ### HTTP client tests
@@ -147,7 +147,7 @@ an account after logout or replace a newer login.
 ### Refresh and the approved memory-only contract
 
 A full browser reload discards the token. The frontend ignores persisted backend-owned domain
-state, preserves only the remaining local match-administration state and returns to login when a protected page is requested. It does not recreate a session
+state and returns to login when a protected page is requested. It does not recreate a session
 from a saved profile, LocalStorage or SessionStorage. This interprets the issue's refresh criterion
 under the approved #39 decision: there is no persistent login across a full reload. If an in-memory
 token is available during SPA navigation/reconciliation, it is accepted only after `/auth/me`.
@@ -185,8 +185,8 @@ before sending, so IDs, timestamps and arbitrary properties are not writable.
 
 The page uses the `useUserAdministration` composable for ephemeral loading, list, form and feedback
 state. It never reads the local user domain store or browser storage. Pinia configuration ignores
-and excludes auth, users, teams and players from active persisted snapshots and preserves only the
-remaining local match domain. It no longer runs the local user/team/player seeders. The old user store/seeder files remain only for
+and excludes auth, users, teams, players and matchStats from active persisted snapshots.
+No domain seeder runs during application startup. The old user store/seeder files remain only for
 legacy compatibility; they are not used by backend administration, and the fictional seeder no
 longer contains password fields. Existing legacy migration backups are not used as a Users database.
 
@@ -273,18 +273,11 @@ mutated to predict those outcomes. A successful DELETE remains successful even i
 read fails; the loading error and retry action show that the refreshed snapshot is unavailable.
 Reloading and signing in again fetches the persisted database records.
 
-### Match-data transition
+### Shared match data after #54
 
-RecordedMatchService provides **read-only** backend match snapshots for charts, statistics,
-comparison, Home/Dashboard summaries and MatchStats browsing. This small bridge is necessary for
-#53: backend team UUIDs cannot be joined with the old fictional match IDs. It introduces no match
-mutation API and does not complete the separate MatchStats administration requirement.
-
-AdminMatchStatsView still edits its legacy browser-local records. Its team selectors now await live
-teams; local create/update awaits that validation and blocks concurrent submits. The page clearly
-labels that these edits do not change database matches shown elsewhere. Old fictional team IDs
-are shown as unavailable rather than remapped by guessed names. MatchStats administration must be
-migrated in its own requirement before this temporary separation is removed.
+The temporary separation introduced in #53 is removed in #54: both administration and analytical
+pages use MatchStatsService and the database records. RecordedMatchService remains only as a
+compatibility alias to the same service; active consumers do not call it or read local match stores.
 
 ### Verification and evaluation
 
@@ -307,18 +300,91 @@ unassigned after the server operation. Reload/sign in again and confirm persiste
 regular account, both pages must be read-only. Stop the backend to inspect error/retry states and
 resume it before retrying. Automated checks do not claim a manual desktop-browser evaluation.
 
+## Backend MatchStats and analytical views — #54
+
+MatchStatsService uses GET collection/detail, POST, PATCH and DELETE of `/match-stats` through the
+existing typed REST resource and ApiService. Public responses preserve ten properties: id, date,
+homeTeamId, awayTeamId, goalsHomeTeam, goalsAwayTeam, stadium, attendance, createdAt and updatedAt.
+Only the seven editable DTO fields are sent; embedded Team objects, IDs and timestamps are never
+submitted as writable data. The backend owns real/non-future dates, distinct existing teams,
+non-negative integer values, stadium normalization and duplicate date/home/away combinations.
+Frontend response readers reject malformed payloads before formatting dates or plotting values.
+
+AdminMatchStatsView uses the shared asynchronous editor, current-record GET before editing,
+normalized server responses after save, SweetAlert2 confirmation before DELETE, and dependency
+reload after deletion. Backend 400/409 feedback stays in the open form without resetting its draft.
+The form remains mounted during reload/error states. A stale 404 draft remains visible and disabled
+until canceled. Duplicate actions and responses from an earlier session cannot mutate current data.
+Regular users have read-only access; real authorization remains in NestJS. 401 clears the matching
+session and 403 refreshes the current role through `/auth/me`.
+
+MatchStats browsing and administration require Teams and MatchStats, not Players. Dashboard,
+Statistics, TeamComparison and Home wait for all three relevant collections. Requests may execute
+in parallel, but labels, tables, counts and charts appear only after every required response is
+successful and its relationship IDs exist in the loaded team snapshot. A missing dependency or
+cross-request relationship race produces error/retry feedback instead of guessed names or false
+zero counts. Reload failures hide previous analytical results until a complete retry succeeds.
+Empty collections remain valid data; zero goals and attendance remain valid values.
+
+`matchAnalytics.ts` centralizes match filters, standings, result distributions, match goals and
+roster goals. Standings reuse the same pure calculation as TeamComparison, including home/away
+results and attendance. Player season totals remain distinct from goals recorded in matches.
+Computed filters update charts without a page reload. No Statistics entity, persisted analytical
+cache, schema change, new HTTP client or dependency is introduced. All obsolete domain snapshots
+are ignored on hydration and excluded on save; remaining non-domain UI preferences are preserved.
+The legacy store/seeder files are retained for compatibility and are unused by analytical views.
+
+### Verification
+
+With Node 24.19.0 and npm 11.9.0, `npm ci` and `npm run verify` pass: ESLint, Prettier, application and
+test types, 146 tests and the production build. The 118 previous tests remain, with persistence
+expectations updated for MatchStats migration and a race fixture adjusted to use consistent IDs.
+Twenty-eight added tests cover transport/DTOs, errors, form/stale-record behavior, partial loads,
+retry, normalized relationships, filters, independent calculation expectations, zero/empty charts
+and rendered form feedback. The real NestJS/SQLite check verifies CRUD, unchanged duplicate keys on
+edit, duplicate 409, invalid dates/teams/numbers/stadium 400, missing IDs 404, team deletion conflicts,
+admin versus regular-user direct API authorization and guest 401. HTTP fixtures do not replace
+cryptographic or database checks. Manual browser testing remains a contributor step.
+
+### Run locally and test in the browser
+
+Use Node 24 compatible with both packages. In a terminal at `soccer-dashboard/backend`, run `npm ci`.
+Copy `.env.example` to `.env` only if `.env` does not exist. Set a private random `JWT_SECRET` in that
+local file before starting NestJS, preserve your SQLite path, and allow the exact Vite origin in
+`CORS_ORIGIN` (the example allows localhost:5173 and 127.0.0.1:5173). Do not commit `.env` or secrets.
+Run `npm run seed` if demo accounts are needed, then `npm run start:dev`. Seed is idempotent and does
+not reset modified existing accounts; no clean/reset seed is required for this frontend change.
+
+In a second terminal at `soccer-dashboard/frontend`, run `npm ci`, preserve or create `.env.local`
+from `.env.example`, set `VITE_API_BASE_URL=http://localhost:3000/api`, and run `npm run dev`.
+Open the URL Vite prints, normally http://localhost:5173. If Vite chooses another port, add that exact
+origin to backend CORS configuration and restart the backend. Restart Vite after changing its env.
+
+1. Login with `admin@soccer.example` / `AdminDemo123` (unless that seeded account was modified).
+2. Create two uniquely named teams with no previous matches. In match administration, create a
+   past-date home 3–away 1 match with attendance 120. Open MatchStats, Statistics, Dashboard and Team
+   Comparison: the new record must appear with the correct team names. The selected pair's results
+   are home W=1/GF=3/GA=1 and away L=1/GF=1/GA=3; attendance is 120 for each team's match result.
+   Season player goals are independent and should not increase merely from creating a match.
+3. Change the match to 0–0 and attendance 0. Match charts/comparison must show a draw and real zeros.
+   Try a duplicate with the same date/home/away: the server error stays inline and the draft remains.
+4. Test team/stadium/date filters, table captions and charts. Filters with no matches show empty
+   results. Cancel a delete and inspect Network: no DELETE or preliminary GET is sent. Confirm
+   deletion and verify the record disappears from match browsing and analytical pages.
+5. Stop the backend while navigating to an analytical page: it must show loading then error/retry,
+   without charts built from partial data. Restart the backend and retry to recover the snapshot.
+6. Login as `user@soccer.example` / `UserDemo123`: reads work and direct `/admin/match-stats` navigation
+   is blocked. The backend also rejects regular-user mutations even if the UI is bypassed.
+7. Reload the browser, login again, and confirm database persistence. The memory-only token is
+   intentionally lost on a full reload; losing login is not losing SQLite records.
+
 ### Dependency audit at implementation time
 
-On 2026-10-08 UTC (2026-10-07 in Colombia), compatible lockfile updates resolved the findings in Vue,
-source-map-js and shell-quote. The production audit (`npm audit --omit=dev`) reports zero
-vulnerabilities. The full audit still reports four high findings in the existing development chain
-`@vue/eslint-config-typescript → fast-glob → micromatch → braces`.
-
-[GHSA-vfj7-8cjw-p6xm](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm) has no published patched
-version of braces. npm proposes an incompatible downgrade of the Vue ESLint configuration via
-`npm audit fix --force`; it was not applied. The full-audit acceptance criterion therefore remains
-pending a reviewed toolchain change or an explicit team decision. This is separate from the HTTP
-client tests and does not mean the full audit passed.
+The production audit (`npm audit --omit=dev`) reports zero vulnerabilities. The full audit continues
+to report four high findings in the development chain
+`@vue/eslint-config-typescript → fast-glob → micromatch → braces`. No dependencies changed in #54.
+The proposed incompatible `npm audit fix --force` downgrade was not applied. Full audit is recorded
+with these findings rather than reported as clean; the toolchain update remains separate work.
 
 The global font-weight reset remains unchanged in this phase to avoid an application-wide visual
 change; it should be reviewed as part of the next visual consistency phase.
