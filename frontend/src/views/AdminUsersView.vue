@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, onScopeDispose, ref } from 'vue';
 
 import DataTable from '@/components/DataTable.vue';
 import OperationFeedback from '@/components/OperationFeedback.vue';
@@ -32,6 +32,10 @@ const {
   deleteUser,
 } = useUserAdministration();
 const isConfirmingDeletion = ref(false);
+let isDisposed = false;
+onScopeDispose(() => {
+  isDisposed = true;
+});
 const areActionsDisabled = computed(
   () => isBusy.value || isConfirmingDeletion.value || !authStore.isAdmin,
 );
@@ -68,9 +72,12 @@ async function handleDelete(id: string): Promise<void> {
   if (areActionsDisabled.value) return;
   const user = users.value.find((record) => record.id === id);
   if (user === undefined) return;
+  const token = authStore.accessToken;
   isConfirmingDeletion.value = true;
   try {
     if (!(await confirmDeletion(user.name))) return;
+    // A pending dialog belongs to the page and session that opened it.
+    if (isDisposed || token !== authStore.accessToken || !authStore.isAdmin) return;
     const result = await deleteUser(id);
     if (!result.success) {
       await showError(result.errors.join(' ') || 'This user could not be deleted.');
