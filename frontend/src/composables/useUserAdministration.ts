@@ -138,7 +138,7 @@ export function useUserAdministration() {
   }
 
   async function deleteUser(id: string): Promise<ServiceResult<undefined>> {
-    if (isBusy.value || !authStore.isAdmin) {
+    if (isDisposed || isBusy.value || !authStore.isAdmin) {
       return { success: false, errors: ['The operation is unavailable. Please try again.'] };
     }
     pendingUserId.value = id;
