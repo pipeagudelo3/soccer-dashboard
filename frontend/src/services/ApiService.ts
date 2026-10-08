@@ -43,7 +43,12 @@ export class ApiService {
 
       return { success: true, data: response.data };
     } catch (error: unknown) {
-      return { success: false, errors: ApiErrorService.getMessages(error, requiresAuth) };
+      const statusCode = ApiErrorService.getStatusCode(error);
+      return {
+        success: false,
+        errors: ApiErrorService.getMessages(error, requiresAuth),
+        ...(statusCode === undefined ? {} : { statusCode }),
+      };
     }
   }
 
