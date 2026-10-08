@@ -43,7 +43,7 @@ npm run lint:fix      # Apply safe ESLint fixes
 npm run format        # Format the entire project with Prettier
 npm run format:check  # Verify formatting without changing files
 npm run type-check    # Check Vue and TypeScript types
-npm run verify        # Run lint, formatting, type checking, and a production build
+npm run verify        # Run lint, formatting, app/test type checks, tests, and a production build
 ```
 
 Run `npm run verify` before opening a pull request.
@@ -82,15 +82,16 @@ JSON headers, a ten-second timeout and the configured base URL. It does not send
 headers, retry failed requests or allow endpoints to escape the API path. Missing/invalid API
 configuration produces a safe failure; there is no silent localhost fallback.
 
-The request interceptor reads `useAuthStore().accessToken` for each request. `setAccessToken()` is the
-integration point for #51 after a successful backend login. The token is kept in memory and excluded
-from both saving and loading `piniaState`. Logout clears it. Reloading does not restore a token.
+The request interceptor reads `useAuthStore().accessToken` for each request. AuthService establishes
+the token, minimal profile and expiry after a successful backend login. The complete auth state is
+kept in memory and excluded from both saving and loading `piniaState`. Logout clears it. Reloading
+does not restore a token or a persisted identity.
 Public authentication requests must use `requiresAuth: false`, so invalid login credentials cannot
 invalidate an existing session.
 
 A protected 401 clears the matching current session. Concurrent failures do not retry or navigate;
 a late response carrying an older token cannot clear a newer session. The existing router guards
-handle subsequent protected navigation. The frontend auth integration in #51 will handle the active
+handle subsequent protected navigation. The session/navigation bridge also handles the active
 page's transition to login. The HTTP client imports no router and creates no redirect loop.
 
 Validation (400/422) and conflict (409) errors preserve string messages from the documented backend
@@ -98,9 +99,10 @@ error envelope. Network failures, timeouts, cancellations, 401, 403, 404 and ser
 predictable presentation messages. Raw Axios errors, request bodies, tokens and server diagnostics
 are never logged or returned by these services. Server errors remain generic.
 
-This requirement prepares the transport layer. Existing local domain services and login continue
-working; migrating login and CRUD to backend calls belongs to #51 and the following integration
-requirements. It uses the approved #39 contract and can be reviewed independently of the #63 merge.
+The shared transport layer is implemented in #50 and backend login/session handling in #51. Domain
+CRUD services remain local until their integration requirements are completed. Local user edits
+cannot change the backend-authenticated identity or role. The runtime login requires the backend
+JWT module (#47, PR #63); the client uses the approved #39 contract.
 
 ### HTTP client tests
 
@@ -113,6 +115,58 @@ npm audit            # Audit all frontend dependencies, including development to
 Tests cover real request serialization, headers, token changes, public login, concurrent/stale 401s,
 validation/status errors, network failures, cancellation, unsafe endpoints, environment validation
 and token exclusion from Pinia persistence. No additional test dependency is required.
+
+## Backend login and session — #51
+
+Start the backend with the #47 authentication module and configure the frontend API address as
+described above. Run `npm run seed` in `backend/` to create the public academic accounts:
+
+| Role          | Email                | Academic password |
+| ------------- | -------------------- | ----------------- |
+| Administrator | admin@soccer.example | AdminDemo123      |
+| Regular user  | user@soccer.example  | UserDemo123       |
+
+The seed is idempotent and preserves previously modified credentials. These accounts are for local
+evaluation only. Credentials from the old frontend fictional store no longer authenticate users.
+
+AuthService sends `POST /auth/login` through ApiService with `requiresAuth: false`, normalizes email,
+preserves the submitted password and returns generic invalid-credential feedback. It accepts the
+documented Bearer response, reconstructs only id/name/email/role and bounds the memory expiry timer
+by both `expiresIn` and the token's `exp`. Decoding exp is for local timing only; NestJS validates JWT
+signatures and applies the real authorization checks. No token role or local user record supplies
+the authenticated identity.
+
+Reconciliation calls `GET /auth/me`, updates the current database profile and role, and coalesces
+simultaneous checks. The router waits before allowing protected routes; App hides protected content
+and displays session loading while validation is pending. A 401, local expiry or account deletion
+clears the session. A temporary network/server failure blocks protected content and keeps only the
+in-memory session candidate for a later validation attempt. Late login/me responses cannot restore
+an account after logout or replace a newer login.
+
+### Refresh and the approved memory-only contract
+
+A full browser reload discards the token. The frontend ignores all persisted auth fields, preserves
+domain data and returns to login when a protected page is requested. It does not recreate a session
+from a saved profile, LocalStorage or SessionStorage. This interprets the issue's refresh criterion
+under the approved #39 decision: there is no persistent login across a full reload. If an in-memory
+token is available during SPA navigation/reconciliation, it is accepted only after `/auth/me`.
+Persistent restoration would require a separately approved contract change; no refresh tokens or
+authentication cookies are added here.
+
+The expiry timer and API request interceptor both enforce the deadline. Logout is local and does
+not revoke an already copied access token on the server before its expiration. A session/navigation
+bridge replaces the active protected route after invalidation or a role downgrade, with one redirect
+in flight to avoid loops. Login redirect parameters accept only known internal routes and never
+point back to login. UI route guards are UX protection; backend guards remain authoritative.
+
+The LoginView awaits the backend result, disables duplicate submission and clears its password
+field. Local Users CRUD no longer updates or deletes the authenticated backend profile. Its API
+migration remains a later requirement; changing that local data does not change backend credentials.
+
+The tests include backend-contract HTTP fixtures and memory-history router navigation: valid/invalid
+login, safe profiles, loading/coalescing, current roles, invalid/deleted/expired sessions, transient
+failures, late responses, automatic expiry, storage exclusion and loop-free navigation. JWT signature
+verification is exercised separately against the actual NestJS backend, not emulated by the fixtures.
 
 ### Dependency audit at implementation time
 

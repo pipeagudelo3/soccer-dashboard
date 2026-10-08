@@ -64,7 +64,12 @@ export class ApiService {
 
     client.interceptors.request.use((config) => {
       if (config.headers.get('Authorization') !== false) {
-        const token = useAuthStore().accessToken;
+        const authStore = useAuthStore();
+        // Background tabs throttle timers; enforce expiration before a new protected request.
+        if (authStore.expiresAt !== null && authStore.expiresAt <= Date.now()) {
+          authStore.clearCurrentUser();
+        }
+        const token = authStore.accessToken;
         config.headers.set('Authorization', token === null ? undefined : `Bearer ${token}`);
       }
 

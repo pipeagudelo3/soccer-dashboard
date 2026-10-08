@@ -17,7 +17,6 @@ let errors: typeof import('../src/services/ApiErrorService.js');
 let environment: typeof import('../src/config/environment.js');
 let auth: typeof import('../src/stores/authstore.js');
 let persistence: typeof import('../src/PiniaConfig.js');
-let localAuth: typeof import('../src/services/AuthService.js');
 let requestCount = 0;
 let handler: (request: IncomingMessage, response: ServerResponse) => void;
 
@@ -44,7 +43,6 @@ before(async () => {
   environment = (await vite.ssrLoadModule('/src/config/environment.ts')) as typeof environment;
   auth = (await vite.ssrLoadModule('/src/stores/authstore.ts')) as typeof auth;
   persistence = (await vite.ssrLoadModule('/src/PiniaConfig.ts')) as typeof persistence;
-  localAuth = (await vite.ssrLoadModule('/src/services/AuthService.ts')) as typeof localAuth;
 });
 
 beforeEach(() => {
@@ -332,8 +330,11 @@ test('never saves or restores the token through centralized Pinia persistence', 
     const saved = JSON.parse(storage.getItem(persistence.piniaStateKey) ?? '{}') as {
       state: { auth: { currentUser: { id: string }; accessToken?: string } };
     };
-    assert.equal(saved.state.auth.currentUser.id, 'test-user');
-    saved.state.auth.accessToken = 'previously-persisted-test-token';
+    assert.equal(saved.state.auth, undefined);
+    saved.state.auth = {
+      currentUser: { id: 'test-user' },
+      accessToken: 'previously-persisted-test-token',
+    };
     storage.setItem(persistence.piniaStateKey, JSON.stringify(saved));
     const reloaded = createPinia();
     setActivePinia(reloaded);
@@ -342,12 +343,8 @@ test('never saves or restores the token through centralized Pinia persistence', 
     assert.ok(
       !storage.getItem(persistence.piniaStateKey)?.includes('previously-persisted-test-token'),
     );
-    // Existing academic login still works; migrating it is explicitly deferred to #51.
-    assert.equal(
-      localAuth.AuthService.login({ email: 'admin@soccerdashboard.test', password: 'Admin123!' })
-        .success,
-      true,
-    );
+    assert.equal(auth.useAuthStore().currentUser, null);
+    assert.equal(auth.useAuthStore().isAuthenticated, false);
   } finally {
     scope.stop();
     if (oldStorage === undefined) {

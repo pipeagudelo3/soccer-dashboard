@@ -1,22 +1,28 @@
 <script setup lang="ts">
-import { RouterView } from 'vue-router';
+import { RouterView, useRoute } from 'vue-router';
 
 import AppHeader from '@/components/AppHeader.vue';
 import { useAuthStore } from '@/stores/authstore.js';
 
 const authStore = useAuthStore();
+const route = useRoute();
 </script>
 
 <template>
   <div class="app-shell">
     <AppHeader
+      v-if="!authStore.isSessionLoading"
       :is-authenticated="authStore.isAuthenticated"
       :user-name="authStore.currentUser?.name ?? null"
       :user-role="authStore.currentUser?.role ?? null"
     />
 
     <main class="main-content">
-      <RouterView />
+      <p v-if="authStore.isSessionLoading" role="status" aria-live="polite">
+        Checking your session...
+      </p>
+      <RouterView v-else-if="route.meta.requiresAuth !== true || authStore.isAuthenticated" />
+      <p v-else role="status">Redirecting to login...</p>
     </main>
 
     <footer class="app-footer">
