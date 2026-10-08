@@ -13,9 +13,12 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write --experimental-cli .",
     "format:check": "prettier --check --experimental-cli .",
-    "verify": "run-s lint format:check type-check build-only"
+    "test": "node --experimental-strip-types --test test/*.test.ts",
+    "type-check:test": "vue-tsc --noEmit -p tsconfig.test.json",
+    "verify": "run-s lint format:check type-check type-check:test test build-only"
   },
   "dependencies": {
+    "axios": "^1.20.0",
     "chart.js": "^4.5.1",
     "pinia": "^4.0.2",
     "sweetalert2": "^11.26.25",
