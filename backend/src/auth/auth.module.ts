@@ -6,10 +6,15 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { EnvironmentModule } from '../config/environment.module.js';
 import type { EnvironmentConfiguration } from '../config/environment.js';
 import { User } from '../users/entities/user.entity.js';
+import { PasswordService } from '../users/password.service.js';
+import { AuthController } from './auth.controller.js';
+import { AuthService } from './auth.service.js';
+import { RolesGuard } from './guards/roles.guard.js';
+import { JwtStrategy } from './strategies/jwt.strategy.js';
 import { AdminGuard } from './guards/admin.guard.js';
 import { JwtAuthGuard } from './guards/jwt-auth.guard.js';
 
-// Aporta solamente verificación de sesión y permisos. Login y /auth/me quedan para #47.
+// Registra login, perfil, estrategia y permisos con las dependencias ya instaladas.
 // No importa UsersModule, evitando una dependencia circular con el CRUD.
 @Module({
   imports: [
@@ -24,8 +29,17 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard.js';
       }),
     }),
   ],
-  providers: [JwtAuthGuard, AdminGuard],
+  controllers: [AuthController],
+  providers: [AuthService, PasswordService, JwtStrategy, JwtAuthGuard, RolesGuard, AdminGuard],
   // Los módulos que usan el guard también necesitan sus dependencias exportadas.
-  exports: [TypeOrmModule, JwtModule, JwtAuthGuard, AdminGuard],
+  exports: [
+    TypeOrmModule,
+    JwtModule,
+    PasswordService,
+    JwtStrategy,
+    JwtAuthGuard,
+    RolesGuard,
+    AdminGuard,
+  ],
 })
 export class AuthModule {}
