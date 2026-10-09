@@ -2,11 +2,12 @@
 import { computed } from 'vue';
 
 import ApiLoadState from '@/components/ApiLoadState.vue';
-import { useTeamPlayerData } from '@/composables/useTeamPlayerData.js';
 import ChartCard from '@/components/ChartCard.vue';
 import DataTable from '@/components/DataTable.vue';
 import PageHeader from '@/components/PageHeader.vue';
+import { useTeamPlayerData } from '@/composables/useTeamPlayerData.js';
 import { useAuthStore } from '@/stores/authstore.js';
+import { calculateRosterGoals } from '@/utils/matchAnalytics.js';
 
 const { teams, players, matchStats, isLoading, hasLoaded, loadErrors, isReady, loadData } =
   useTeamPlayerData(true);
@@ -31,22 +32,13 @@ const summaryCards = computed(() => [
 ]);
 
 const goalsByTeamChart = computed(() => {
-  const totals = new Map<string, number>();
-
-  for (const player of players.value) {
-    if (player.teamId === null) {
-      continue;
-    }
-
-    totals.set(player.teamId, (totals.get(player.teamId) ?? 0) + player.goals);
-  }
-
+  const totals = calculateRosterGoals(teams.value, players.value);
   return {
-    labels: [...totals.keys()].map(getTeamName),
+    labels: totals.map((total) => total.team),
     datasets: [
       {
         label: 'Goals',
-        data: [...totals.values()],
+        data: totals.map((total) => total.goals),
         backgroundColor: '#2563eb',
         borderRadius: 6,
       },
@@ -106,7 +98,7 @@ const matchRows = computed(() =>
       :is-loading="isLoading"
       :errors="loadErrors"
       :has-loaded="hasLoaded"
-      :is-empty="teams.length === 0"
+      :is-empty="teams.length === 0 && players.length === 0 && matchStats.length === 0"
       @retry="loadData"
     />
     <template v-if="isReady">

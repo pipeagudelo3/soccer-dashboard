@@ -471,7 +471,7 @@ test('stale DELETE 404 removes only the vanished row and exposes feedback', asyn
   );
   assert.ok(page.feedbackErrors.value.length > 0);
 });
-test('backend-owned domains are neither hydrated nor saved while local match state survives', async () => {
+test('backend-owned domains are neither hydrated nor saved while UI preferences survive', async () => {
   const values = new Map<string, string>();
   const local = {
     getItem: (key: string) => values.get(key) ?? null,
@@ -493,6 +493,7 @@ test('backend-owned domains are neither hydrated nor saved while local match sta
           teams: { teams: [{ id: 'preserved-team' }] },
           players: { players: [] },
           matchStats: { matchStats: [] },
+          preferences: { theme: 'dark' },
         },
       }),
     );
@@ -503,7 +504,8 @@ test('backend-owned domains are neither hydrated nor saved while local match sta
     assert.equal(pinia.state.value.auth, undefined);
     assert.equal(pinia.state.value.teams, undefined);
     assert.equal(pinia.state.value.players, undefined);
-    assert.deepEqual(pinia.state.value.matchStats, { matchStats: [] });
+    assert.equal(pinia.state.value.matchStats, undefined);
+    assert.deepEqual(pinia.state.value.preferences, { theme: 'dark' });
     assert.ok(!local.getItem('piniaState')?.includes('preserved-team'));
     assert.ok(!local.getItem('piniaState')?.includes('old-secret'));
   } finally {

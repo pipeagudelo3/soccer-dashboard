@@ -24,7 +24,7 @@ export function isCount(value: unknown): value is number {
   );
 }
 
-// Teams and Players share transport behavior; their DTOs and public response readers stay separate.
+// Teams, Players and MatchStats share transport behavior; their DTOs and public response readers stay separate.
 export function createRestResource<T, Create extends object, Update extends object>(
   endpoint: string,
   read: (value: unknown) => T | null,
