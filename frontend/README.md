@@ -84,7 +84,7 @@ configuration produces a safe failure; there is no silent localhost fallback.
 
 The request interceptor reads `useAuthStore().accessToken` for each request. AuthService establishes
 the token, minimal profile and expiry after a successful backend login. The complete auth state is
-kept in memory and excluded from both saving and loading `piniaState`. Logout clears it. Reloading
+kept only in memory. The retired `piniaState` key is deleted at startup. Logout clears the session. Reloading
 does not restore a token or a persisted identity.
 Public authentication requests must use `requiresAuth: false`, so invalid login credentials cannot
 invalidate an existing session.
@@ -115,7 +115,7 @@ npm audit            # Audit all frontend dependencies, including development to
 
 Tests cover real request serialization, headers, token changes, public login, concurrent/stale 401s,
 validation/status errors, network failures, cancellation, unsafe endpoints, environment validation
-and token exclusion from Pinia persistence. No additional test dependency is required.
+and memory-only token handling. No additional test dependency is required.
 
 ## Backend login and session — #51
 
@@ -146,8 +146,8 @@ an account after logout or replace a newer login.
 
 ### Refresh and the approved memory-only contract
 
-A full browser reload discards the token. The frontend ignores persisted backend-owned domain
-state and returns to login when a protected page is requested. It does not recreate a session
+A full browser reload discards the token. The frontend removes the retired backend-owned domain
+snapshot and returns to login when a protected page is requested. It does not recreate a session
 from a saved profile, LocalStorage or SessionStorage. This interprets the issue's refresh criterion
 under the approved #39 decision: there is no persistent login across a full reload. If an in-memory
 token is available during SPA navigation/reconciliation, it is accepted only after `/auth/me`.
@@ -184,11 +184,9 @@ it never overwrites the existing password with an empty value. DTO fields are ex
 before sending, so IDs, timestamps and arbitrary properties are not writable.
 
 The page uses the `useUserAdministration` composable for ephemeral loading, list, form and feedback
-state. It never reads the local user domain store or browser storage. Pinia configuration ignores
-and excludes auth, users, teams, players and matchStats from active persisted snapshots.
-No domain seeder runs during application startup. The old user store/seeder files remain only for
-legacy compatibility; they are not used by backend administration, and the fictional seeder no
-longer contains password fields. Existing legacy migration backups are not used as a Users database.
+state. It never reads a local domain store or browser storage. Pinia is used only for the
+in-memory authentication state. Obsolete domain stores, seeders and persistence have been removed;
+the old `piniaState` key is deleted at startup without loading its contents.
 
 Initial loading, empty results, errors and explicit retry/reload states are visible. During writes,
 form fields and duplicate submission are blocked; validation/conflict errors stay inline and keep
@@ -218,7 +216,7 @@ A successful write is not reported as failed merely because a later profile chec
 `npm run verify` includes transport, authentication/navigation, Users administration and
 Teams/Players integration tests. The 33 Users service, page-state and form-rendering tests cover DTO serialization, safe responses, permissions,
 validation/conflicts, loading/retry/empty states, stale records, races, self-update/self-delete,
-legacy snapshot exclusion and preservation of inline form feedback. Test Vite servers disable
+API contract isolation and preservation of inline form feedback. Test Vite servers disable
 HMR/WebSocket because no browser hot reload is needed; parallel files no longer compete for port 24678. No dependency was added for this requirement.
 
 A separate check uses the actual NestJS backend and isolated SQLite data to verify CRUD, normalized
@@ -276,8 +274,8 @@ Reloading and signing in again fetches the persisted database records.
 ### Shared match data after #54
 
 The temporary separation introduced in #53 is removed in #54: both administration and analytical
-pages use MatchStatsService and the database records. RecordedMatchService remains only as a
-compatibility alias to the same service; active consumers do not call it or read local match stores.
+pages use MatchStatsService and the database records. The unused RecordedMatchService compatibility
+alias was removed in #55; no consumer reads local match stores.
 
 ### Verification and evaluation
 
@@ -330,9 +328,9 @@ Empty collections remain valid data; zero goals and attendance remain valid valu
 roster goals. Standings reuse the same pure calculation as TeamComparison, including home/away
 results and attendance. Player season totals remain distinct from goals recorded in matches.
 Computed filters update charts without a page reload. No Statistics entity, persisted analytical
-cache, schema change, new HTTP client or dependency is introduced. All obsolete domain snapshots
-are ignored on hydration and excluded on save; remaining non-domain UI preferences are preserved.
-The legacy store/seeder files are retained for compatibility and are unused by analytical views.
+cache, schema change, new HTTP client or dependency is introduced. The retired domain snapshot
+is deleted at startup; there are no browser persistence subscriptions. Unrelated storage keys are untouched.
+Legacy domain stores and seeders have been removed. Analytical views use disposable API snapshots.
 
 ### Verification
 
@@ -394,3 +392,26 @@ change; it should be reviewed as part of the next visual consistency phase.
 Use [Visual Studio Code](https://code.visualstudio.com/) with the
 [Vue - Official](https://marketplace.visualstudio.com/items?itemName=Vue.volar) and
 [Prettier](https://marketplace.visualstudio.com/items?itemName=esbenp.prettier-vscode) extensions.
+
+## Obsolete domain persistence cleanup — issue #55
+
+NestJS and SQLite are the only persisted domain source. The four frontend domain stores, four
+seeders, local ID generator and `PiniaConfig.ts` have been removed. Interfaces and DTOs remain
+because they define the typed API contracts. Pinia remains useful only for the shared, in-memory
+authentication state; page data and filters use Vue reactive state.
+
+`LegacyStorageService.clearObsoleteState()` runs once per application startup, before session
+reconciliation. It removes only the old `piniaState` key, without reading, parsing, migrating or
+backing up its contents. Unrelated storage keys are untouched. Repeated cleanup is idempotent and
+handles returning users of older deployments. If browser storage is blocked, a generic warning is
+logged and the application continues with the API; old state is never consumed as a fallback.
+No token, profile, fixture, domain record or UI preference is persisted by the application.
+
+Reloading starts a guest session under the approved memory-only token policy. After logging in,
+pages retrieve current backend records; they never recreate fictional frontend records. Backend
+seed commands remain available only for deliberate database setup. Full-stack smoke verification
+uses an isolated SQLite database, real NestJS login/CRUD, browser storage cleanup, and a new Pinia
+instance to model reload. The complete frontend `npm run verify` passes with 149 tests on Node 24.19.0.
+Production audit reports zero vulnerabilities; the full audit still reports four pre-existing high
+severity development dependency findings. No dependency or lockfile change was made in #55.
+Manual browser checks remain required before final team approval.
