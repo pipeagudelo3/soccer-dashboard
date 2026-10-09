@@ -1,17 +1,16 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 
+import ApiLoadState from '@/components/ApiLoadState.vue';
+import { useTeamPlayerData } from '@/composables/useTeamPlayerData.js';
 import ChartCard from '@/components/ChartCard.vue';
 import DataTable from '@/components/DataTable.vue';
 import FilterSelect from '@/components/FilterSelect.vue';
 import PageHeader from '@/components/PageHeader.vue';
-import { MatchStatsService } from '@/services/MatchStatsService.js';
-import { PlayerService } from '@/services/PlayerService.js';
-import { TeamService } from '@/services/TeamService.js';
 
-const players = computed(() => PlayerService.getPlayers());
-const matchStats = computed(() => MatchStatsService.getMatchStats());
-const teams = computed(() => TeamService.getTeams());
+const { teams, players, matchStats, isLoading, hasLoaded, loadErrors, isReady, loadData } =
+  useTeamPlayerData(true);
+
 const teamsById = computed(() => new Map(teams.value.map((team) => [team.id, team])));
 
 function getTeamName(teamId: string): string {
@@ -297,86 +296,94 @@ function clearFilters(): void {
         <button type="button" class="clear-button" @click="clearFilters">Clear filters</button>
       </template>
     </PageHeader>
+    <ApiLoadState
+      :is-loading="isLoading"
+      :errors="loadErrors"
+      :has-loaded="hasLoaded"
+      :is-empty="teams.length === 0"
+      @retry="loadData"
+    />
+    <template v-if="isReady">
+      <section class="filters-bar" aria-label="Statistics filters">
+        <FilterSelect v-model="teamFilter" label="Team" :options="teamOptions" />
+        <FilterSelect v-model="positionFilter" label="Player position" :options="positionOptions" />
+        <label class="date-field">
+          <span>Matches from</span>
+          <input v-model="startDateFilter" type="date" :max="endDateFilter || undefined" />
+        </label>
+        <label class="date-field">
+          <span>Matches to</span>
+          <input v-model="endDateFilter" type="date" :min="startDateFilter || undefined" />
+        </label>
+      </section>
 
-    <section class="filters-bar" aria-label="Statistics filters">
-      <FilterSelect v-model="teamFilter" label="Team" :options="teamOptions" />
-      <FilterSelect v-model="positionFilter" label="Player position" :options="positionOptions" />
-      <label class="date-field">
-        <span>Matches from</span>
-        <input v-model="startDateFilter" type="date" :max="endDateFilter || undefined" />
-      </label>
-      <label class="date-field">
-        <span>Matches to</span>
-        <input v-model="endDateFilter" type="date" :min="startDateFilter || undefined" />
-      </label>
-    </section>
+      <p class="filter-note">
+        Position filters player indicators. Date filters match and team indicators because Player
+        stores season totals without a per-match date relationship.
+      </p>
 
-    <p class="filter-note">
-      Position filters player indicators. Date filters match and team indicators because Player
-      stores season totals without a per-match date relationship.
-    </p>
+      <section class="summary-grid" aria-label="Statistics summary">
+        <article v-for="card in summaryCards" :key="card.label" class="summary-card">
+          <span class="summary-value">{{ card.value }}</span>
+          <span class="summary-label">{{ card.label }}</span>
+        </article>
+      </section>
 
-    <section class="summary-grid" aria-label="Statistics summary">
-      <article v-for="card in summaryCards" :key="card.label" class="summary-card">
-        <span class="summary-value">{{ card.value }}</span>
-        <span class="summary-label">{{ card.label }}</span>
-      </article>
-    </section>
+      <section class="statistics-section">
+        <header class="section-header">
+          <h2>Player indicators</h2>
+          <p>All values come from the approved Player fields.</p>
+        </header>
 
-    <section class="statistics-section">
-      <header class="section-header">
-        <h2>Player indicators</h2>
-        <p>All values come from the approved Player fields.</p>
-      </header>
+        <div class="charts-grid">
+          <ChartCard
+            title="Goal contributions"
+            description="Goals and assists for the leading filtered players."
+            type="bar"
+            :data="playerContributionsChart"
+          />
+        </div>
 
-      <div class="charts-grid">
-        <ChartCard
-          title="Goal contributions"
-          description="Goals and assists for the leading filtered players."
-          type="bar"
-          :data="playerContributionsChart"
+        <DataTable
+          :columns="playerColumns"
+          :rows="playerRows"
+          row-key="id"
+          caption="Filtered player goals and assists"
+          empty-message="No players match the selected filters."
         />
-      </div>
+      </section>
 
-      <DataTable
-        :columns="playerColumns"
-        :rows="playerRows"
-        row-key="id"
-        caption="Filtered player goals and assists"
-        empty-message="No players match the selected filters."
-      />
-    </section>
+      <section class="statistics-section">
+        <header class="section-header">
+          <h2>Team and match indicators</h2>
+          <p>Results, goals, and attendance are calculated exclusively from MatchStats.</p>
+        </header>
 
-    <section class="statistics-section">
-      <header class="section-header">
-        <h2>Team and match indicators</h2>
-        <p>Results, goals, and attendance are calculated exclusively from MatchStats.</p>
-      </header>
+        <div class="charts-grid">
+          <ChartCard
+            title="Team goals"
+            description="Goals for and against in the currently filtered matches."
+            type="bar"
+            :data="goalsByTeamChart"
+          />
+          <ChartCard
+            title="Attendance by match"
+            description="Attendance trend for the currently filtered matches."
+            type="line"
+            :data="attendanceByMatchChart"
+            :options="{ plugins: { legend: { display: false } } }"
+          />
+        </div>
 
-      <div class="charts-grid">
-        <ChartCard
-          title="Team goals"
-          description="Goals for and against in the currently filtered matches."
-          type="bar"
-          :data="goalsByTeamChart"
+        <DataTable
+          :columns="teamMatchColumns"
+          :rows="teamMatchRows"
+          row-key="id"
+          caption="Team results, goals, and attendance from filtered matches"
+          empty-message="No matches match the selected filters."
         />
-        <ChartCard
-          title="Attendance by match"
-          description="Attendance trend for the currently filtered matches."
-          type="line"
-          :data="attendanceByMatchChart"
-          :options="{ plugins: { legend: { display: false } } }"
-        />
-      </div>
-
-      <DataTable
-        :columns="teamMatchColumns"
-        :rows="teamMatchRows"
-        row-key="id"
-        caption="Team results, goals, and attendance from filtered matches"
-        empty-message="No matches match the selected filters."
-      />
-    </section>
+      </section>
+    </template>
   </div>
 </template>
 

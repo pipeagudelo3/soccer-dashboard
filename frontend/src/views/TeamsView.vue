@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 
+import ApiLoadState from '@/components/ApiLoadState.vue';
+import { useTeamPlayerData } from '@/composables/useTeamPlayerData.js';
+import { useResourceAdministration } from '@/composables/useResourceAdministration.js';
 import ChartCard from '@/components/ChartCard.vue';
 import DataTable from '@/components/DataTable.vue';
 import FilterSelect from '@/components/FilterSelect.vue';
@@ -9,23 +12,39 @@ import PageHeader from '@/components/PageHeader.vue';
 import TeamFormPanel from '@/components/TeamFormPanel.vue';
 import type { CreateTeamDTO } from '@/dtos/CreateTeamDTO.js';
 import type { TeamInterface } from '@/interfaces/TeamInterface.js';
-import { PlayerService } from '@/services/PlayerService.js';
-import type { ServiceResult } from '@/services/ServiceResult.js';
 import { TeamService } from '@/services/TeamService.js';
 import { useAuthStore } from '@/stores/authstore.js';
 import { confirmDeletion, showError, showSuccess } from '@/utils/notifications.js';
 
 const authStore = useAuthStore();
 
-const teams = ref<TeamInterface[]>(TeamService.getTeams());
-const players = computed(() => PlayerService.getPlayers());
-
+const { teams, players, isLoading, hasLoaded, loadErrors, isReady, loadData } = useTeamPlayerData();
+const {
+  editingRecord: editingTeam,
+  isFormOpen,
+  isSaving,
+  isStale,
+  feedbackErrors,
+  feedbackMessage,
+  isBusy,
+  openCreateForm,
+  openEditForm,
+  closeForm,
+  save,
+  deleteRecord,
+} = useResourceAdministration<TeamInterface, CreateTeamDTO, CreateTeamDTO>(
+  teams,
+  isLoading,
+  loadData,
+  {
+    get: TeamService.getTeamById,
+    create: TeamService.createTeam,
+    update: TeamService.updateTeam,
+    remove: TeamService.deleteTeam,
+  },
+  'Team',
+);
 const countryFilter = ref('all');
-const isFormOpen = ref(false);
-const editingTeam = ref<TeamInterface | null>(null);
-const feedbackErrors = ref<string[]>([]);
-const feedbackMessage = ref<string | null>(null);
-
 const countryOptions = computed(() => {
   const countries = [...new Set(teams.value.map((team) => team.country))].sort();
   return [
@@ -76,86 +95,16 @@ const playersPerTeamChart = computed(() => ({
   ],
 }));
 
-function refreshTeams(): void {
-  teams.value = TeamService.getTeams();
+function handleSubmit(payload: CreateTeamDTO): Promise<void> {
+  return save(payload);
 }
-
-function openCreateForm(): void {
-  if (!authStore.isAdmin) {
-    return;
-  }
-
-  editingTeam.value = null;
-  feedbackErrors.value = [];
-  feedbackMessage.value = null;
-  isFormOpen.value = true;
-}
-
-function openEditForm(teamId: string): void {
-  if (!authStore.isAdmin) {
-    return;
-  }
-
-  editingTeam.value = TeamService.getTeamById(teamId) ?? null;
-  feedbackErrors.value = [];
-  feedbackMessage.value = null;
-  isFormOpen.value = editingTeam.value !== null;
-}
-
-function closeForm(): void {
-  isFormOpen.value = false;
-  editingTeam.value = null;
-}
-
-function handleResult<T>(result: ServiceResult<T>, successMessage: string): boolean {
+async function handleDelete(id: string): Promise<void> {
+  const result = await deleteRecord(id, confirmDeletion);
   if (!result.success) {
-    feedbackErrors.value = result.errors;
-    feedbackMessage.value = null;
-    return false;
-  }
-
-  feedbackErrors.value = [];
-  feedbackMessage.value = successMessage;
-  refreshTeams();
-  closeForm();
-  return true;
-}
-
-function handleSubmit(payload: CreateTeamDTO): void {
-  if (editingTeam.value === null) {
-    handleResult(TeamService.createTeam(payload), 'Team created successfully.');
+    await showError(result.errors.join(' '));
     return;
   }
-
-  handleResult(TeamService.updateTeam(editingTeam.value.id, payload), 'Team updated successfully.');
-}
-
-async function handleDelete(teamId: string): Promise<void> {
-  if (!authStore.isAdmin) {
-    return;
-  }
-
-  const team = TeamService.getTeamById(teamId);
-  const confirmed = await confirmDeletion(team?.name ?? 'this team');
-
-  if (!confirmed) {
-    return;
-  }
-
-  const result = TeamService.deleteTeam(teamId);
-
-  if (!result.success) {
-    feedbackErrors.value = [];
-    feedbackMessage.value = null;
-    await showError(result.errors.join(' ') || 'This team could not be deleted.');
-    return;
-  }
-
-  feedbackErrors.value = [];
-  feedbackMessage.value = null;
-  refreshTeams();
-  closeForm();
-  await showSuccess('Team deleted successfully.');
+  if (result.data) await showSuccess('Team deleted successfully.');
 }
 </script>
 
@@ -170,6 +119,7 @@ async function handleDelete(teamId: string): Promise<void> {
           v-if="authStore.isAdmin"
           type="button"
           class="button-primary"
+          :disabled="isBusy || !isReady"
           @click="openCreateForm"
         >
           Add team
@@ -177,45 +127,72 @@ async function handleDelete(teamId: string): Promise<void> {
       </template>
     </PageHeader>
 
-    <OperationFeedback :errors="feedbackErrors" :success-message="feedbackMessage" />
+    <ApiLoadState
+      :is-loading="isLoading"
+      :errors="loadErrors"
+      :has-loaded="hasLoaded"
+      :is-empty="teams.length === 0"
+      @retry="loadData"
+    />
+
+    <OperationFeedback
+      :errors="isFormOpen ? [] : feedbackErrors"
+      :success-message="feedbackMessage"
+    />
 
     <TeamFormPanel
-      v-if="isFormOpen"
+      v-if="isFormOpen && authStore.isAdmin"
       :editing-team="editingTeam"
+      :is-submitting="isSaving"
+      :is-disabled="isBusy || !isReady || !authStore.isAdmin"
+      :is-stale="isStale"
+      :errors="feedbackErrors"
       @submit="handleSubmit"
       @cancel="closeForm"
     />
 
-    <section class="filters-bar">
-      <FilterSelect v-model="countryFilter" label="Country" :options="countryOptions" />
-    </section>
+    <template v-if="isReady">
+      <section class="filters-bar">
+        <FilterSelect v-model="countryFilter" label="Country" :options="countryOptions" />
+      </section>
 
-    <ChartCard
-      title="Players per team"
-      description="Squad size for each team currently visible in the list below."
-      type="bar"
-      :data="playersPerTeamChart"
-      :options="{ plugins: { legend: { display: false } } }"
-    />
+      <ChartCard
+        title="Players per team"
+        description="Squad size for each team currently visible in the list below."
+        type="bar"
+        :data="playersPerTeamChart"
+        :options="{ plugins: { legend: { display: false } } }"
+      />
 
-    <DataTable
-      :columns="teamColumns"
-      :rows="teamRows"
-      row-key="id"
-      caption="Teams and their current squad sizes"
-      empty-message="No teams match the selected filter."
-    >
-      <template #cell-actions="{ row }">
-        <div class="row-actions">
-          <button type="button" class="link-button" @click="openEditForm(String(row.id))">
-            Edit
-          </button>
-          <button type="button" class="link-button danger" @click="handleDelete(String(row.id))">
-            Delete
-          </button>
-        </div>
-      </template>
-    </DataTable>
+      <DataTable
+        :columns="teamColumns"
+        :rows="teamRows"
+        row-key="id"
+        caption="Teams and their current squad sizes"
+        empty-message="No teams match the selected filter."
+      >
+        <template #cell-actions="{ row }">
+          <div class="row-actions">
+            <button
+              type="button"
+              class="link-button"
+              :disabled="isBusy"
+              @click="openEditForm(String(row.id))"
+            >
+              Edit
+            </button>
+            <button
+              type="button"
+              class="link-button danger"
+              :disabled="isBusy"
+              @click="handleDelete(String(row.id))"
+            >
+              Delete
+            </button>
+          </div>
+        </template>
+      </DataTable>
+    </template>
   </div>
 </template>
 

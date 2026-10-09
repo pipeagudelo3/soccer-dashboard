@@ -7,6 +7,7 @@ import type { MatchStatsInterface } from '@/interfaces/MatchStatsInterface.js';
 import type { TeamInterface } from '@/interfaces/TeamInterface.js';
 
 interface Props {
+  isSubmitting?: boolean;
   editingMatchStats: MatchStatsInterface | null;
   teams: TeamInterface[];
 }
@@ -21,7 +22,7 @@ interface MatchStatsFormState {
   attendance: number;
 }
 
-const props = defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), { isSubmitting: false });
 
 const emit = defineEmits<{
   create: [payload: CreateMatchStatsDTO];
@@ -66,6 +67,7 @@ watch(
 );
 
 function handleSubmit(): void {
+  if (props.isSubmitting) return;
   if (
     !props.teams.some((team) => team.id === form.homeTeamId) ||
     !props.teams.some((team) => team.id === form.awayTeamId)
@@ -102,17 +104,17 @@ function handleSubmit(): void {
     <div class="form-grid">
       <label>
         <span>Date</span>
-        <input v-model="form.date" type="date" required />
+        <input :disabled="props.isSubmitting" v-model="form.date" type="date" required />
       </label>
 
       <label>
         <span>Stadium</span>
-        <input v-model="form.stadium" type="text" required />
+        <input :disabled="props.isSubmitting" v-model="form.stadium" type="text" required />
       </label>
 
       <label>
         <span>Home team</span>
-        <select v-model="form.homeTeamId" required>
+        <select :disabled="props.isSubmitting" v-model="form.homeTeamId" required>
           <option value="" disabled>Select a team</option>
           <option
             v-for="team in props.teams"
@@ -127,7 +129,7 @@ function handleSubmit(): void {
 
       <label>
         <span>Away team</span>
-        <select v-model="form.awayTeamId" required>
+        <select :disabled="props.isSubmitting" v-model="form.awayTeamId" required>
           <option value="" disabled>Select a team</option>
           <option
             v-for="team in props.teams"
@@ -142,23 +144,51 @@ function handleSubmit(): void {
 
       <label>
         <span>Home team goals</span>
-        <input v-model.number="form.goalsHomeTeam" type="number" min="0" step="1" required />
+        <input
+          :disabled="props.isSubmitting"
+          v-model.number="form.goalsHomeTeam"
+          type="number"
+          min="0"
+          step="1"
+          required
+        />
       </label>
 
       <label>
         <span>Away team goals</span>
-        <input v-model.number="form.goalsAwayTeam" type="number" min="0" step="1" required />
+        <input
+          :disabled="props.isSubmitting"
+          v-model.number="form.goalsAwayTeam"
+          type="number"
+          min="0"
+          step="1"
+          required
+        />
       </label>
 
       <label class="form-grid-full">
         <span>Attendance</span>
-        <input v-model.number="form.attendance" type="number" min="0" step="1" required />
+        <input
+          :disabled="props.isSubmitting"
+          v-model.number="form.attendance"
+          type="number"
+          min="0"
+          step="1"
+          required
+        />
       </label>
     </div>
 
     <div class="form-actions">
-      <button type="button" class="button-secondary" @click="emit('cancel')">Cancel</button>
-      <button type="submit" class="button-primary">
+      <button
+        type="button"
+        class="button-secondary"
+        :disabled="props.isSubmitting"
+        @click="emit('cancel')"
+      >
+        Cancel
+      </button>
+      <button type="submit" class="button-primary" :disabled="props.isSubmitting">
         {{ props.editingMatchStats === null ? 'Create match statistics' : 'Save changes' }}
       </button>
     </div>
