@@ -4,7 +4,7 @@ import { computed, ref } from 'vue';
 import type { AuthenticatedUserInterface } from '@/interfaces/AuthenticatedUserInterface.js';
 
 export const useAuthStore = defineStore('auth', () => {
-  // The whole auth state is ephemeral; configurePinia never hydrates or persists it.
+  // Session state stays in memory; no persistence plugin or storage subscription is installed.
   const currentUser = ref<AuthenticatedUserInterface | null>(null);
   const accessToken = ref<string | null>(null);
   const expiresAt = ref<number | null>(null);
