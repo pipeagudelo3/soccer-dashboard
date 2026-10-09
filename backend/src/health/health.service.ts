@@ -1,9 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
-// Define la respuesta pública sin revelar información de infraestructura.
-export interface HealthResponseDTO {
-  status: 'ok';
-}
+import type { HealthResponseDTO } from './dto/health-response.dto.js';
 
 // Confirma que el proceso de la API responde; aún no comprueba una base de datos.
 @Injectable()
