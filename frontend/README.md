@@ -415,3 +415,15 @@ instance to model reload. The complete frontend `npm run verify` passes with 149
 Production audit reports zero vulnerabilities; the full audit still reports four pre-existing high
 severity development dependency findings. No dependency or lockfile change was made in #55.
 Manual browser checks remain required before final team approval.
+
+## Regresión full-stack (#56)
+
+Con frontend y backend instalados y el backend compilado, ejecutar desde esta carpeta:
+
+```sh
+npm run test:full-stack
+```
+
+La prueba usa una SQLite temporal y servicios reales mediante HTTP. Consultar
+[la matriz](../REGRESSION_MATRIX.md) y [la evidencia y pasos de navegador](../REGRESSION_EVIDENCE.md).
+Las verificaciones visuales y de contenedores deben completarse aparte.
