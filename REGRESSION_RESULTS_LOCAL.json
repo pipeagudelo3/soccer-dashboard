@@ -1,0 +1,152 @@
+{
+  "node": "v26.5.0",
+  "startedAt": "2026-10-09T06:27:49.595Z",
+  "completedAt": "2026-10-09T06:27:59.317Z",
+  "outcomes": [
+    {
+      "id": "DB-01",
+      "title": "Isolated SQLite migrations and idempotent explicit backend seed",
+      "status": "PASS"
+    },
+    {
+      "id": "ST-01",
+      "title": "Legacy cleanup removes only piniaState without reading or recreating fixtures",
+      "status": "PASS"
+    },
+    {
+      "id": "AUTH-01",
+      "title": "Administrator login normalizes email and keeps a safe in-memory profile",
+      "status": "PASS"
+    },
+    {
+      "id": "AUTH-02",
+      "title": "Unknown email and wrong password return identical generic 401 feedback",
+      "status": "PASS"
+    },
+    {
+      "id": "AUTH-03",
+      "title": "Missing, invalid and expired JWTs are rejected on every protected domain",
+      "status": "PASS"
+    },
+    {
+      "id": "AUTH-04",
+      "title": "Real backend role checks reject regular-user direct mutations with 403",
+      "status": "PASS"
+    },
+    {
+      "id": "AUTH-05",
+      "title": "Actual guard with real auth/me permits admin routes and prevents guest/user loops",
+      "status": "PASS"
+    },
+    {
+      "id": "US-01",
+      "title": "Users create/read/update/delete through Axios and Nest return safe database records",
+      "status": "PASS"
+    },
+    {
+      "id": "US-02",
+      "title": "Duplicate email, invalid role/password and stale user IDs preserve consistent feedback",
+      "status": "PASS"
+    },
+    {
+      "id": "US-03",
+      "title": "Last administrator cannot be removed or demoted",
+      "status": "PASS"
+    },
+    {
+      "id": "US-04",
+      "title": "Role changes and deleted accounts invalidate old authority on protected requests",
+      "status": "PASS"
+    },
+    {
+      "id": "TM-01",
+      "title": "Teams create/read/update and duplicate/invalid checks use the database",
+      "status": "PASS"
+    },
+    {
+      "id": "PL-01",
+      "title": "Players create/update preserve nine fields and nullable normalized teamId",
+      "status": "PASS"
+    },
+    {
+      "id": "PL-02",
+      "title": "Unknown teams, invalid status/counts and stale player IDs are rejected",
+      "status": "PASS"
+    },
+    {
+      "id": "MA-01",
+      "title": "Matches create/read/update retain ten fields, real dates and zero values",
+      "status": "PASS"
+    },
+    {
+      "id": "MA-02",
+      "title": "Different existing teams, real non-future dates and finite nonnegative counts are required",
+      "status": "PASS"
+    },
+    {
+      "id": "MA-03",
+      "title": "Exact duplicates are rejected; unchanged edited identity excludes its own record",
+      "status": "PASS"
+    },
+    {
+      "id": "AN-01",
+      "title": "Coherent Vue snapshots and analytical calculations match real backend fixtures",
+      "status": "PASS"
+    },
+    {
+      "id": "UI-01",
+      "title": "Loading hides readiness until all real dependent HTTP reads complete",
+      "status": "PASS"
+    },
+    {
+      "id": "UI-02",
+      "title": "Injected dependency 500 prevents partial analysis and supports explicit retry",
+      "status": "PASS"
+    },
+    {
+      "id": "UI-03",
+      "title": "Injected empty lists expose empty state without invented fixtures or chart data",
+      "status": "PASS"
+    },
+    {
+      "id": "UI-04",
+      "title": "Stale records disappear after real deletion and the editor remains safely blocked",
+      "status": "PASS"
+    },
+    {
+      "id": "AUTH-06",
+      "title": "An invalid active token clears session on 401 without request retry loops",
+      "status": "PASS"
+    },
+    {
+      "id": "DB-02",
+      "title": "Stopping the real backend produces a safe network error with no local fallback",
+      "status": "PASS"
+    },
+    {
+      "id": "DB-03",
+      "title": "A new backend process and new Pinia instance preserve SQLite records after re-login",
+      "status": "PASS"
+    },
+    {
+      "id": "REL-01",
+      "title": "Teams with matches return 409; after match deletion players become null atomically",
+      "status": "PASS"
+    },
+    {
+      "id": "HTTP-01",
+      "title": "CORS preflight accepts only the configured origin and JWT headers",
+      "status": "PASS"
+    },
+    {
+      "id": "LOG-01",
+      "title": "Backend child logs contain no secrets, tokens or unhandled runtime errors",
+      "status": "PASS"
+    }
+  ],
+  "pending": [
+    "BROWSER: actual UI rendering/console",
+    "CONTAINER: Docker restart with persistent volume"
+  ],
+  "database": "Disposable temporary SQLite, removed after run"
+}
