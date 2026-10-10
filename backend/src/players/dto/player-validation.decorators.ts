@@ -4,9 +4,12 @@ import { IsIn, IsUUID, ValidateIf } from 'class-validator';
 import { NonNegativeInteger } from '../../common/validation/non-negative-integer.decorator.js';
 import { TrimmedText } from '../../common/validation/trimmed-text.decorator.js';
 
-// Conserva los estados del frontend y no impone un estado al desvincular un equipo.
+// Estados del frontend; validación y documentación OpenAPI usan la misma lista.
+export const PLAYER_STATUSES = ['active', 'injured', 'suspended', 'free-agent'] as const;
+
+// No impone un estado al desvincular un equipo.
 export function PlayerStatus(): PropertyDecorator {
-  return applyDecorators(TrimmedText(), IsIn(['active', 'injured', 'suspended', 'free-agent']));
+  return applyDecorators(TrimmedText(), IsIn(PLAYER_STATUSES));
 }
 
 // IsInt rechaza NaN e infinito; Max mantiene precisión JSON y coincide con el CHECK SQLite.

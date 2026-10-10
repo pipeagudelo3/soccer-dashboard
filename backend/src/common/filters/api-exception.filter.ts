@@ -5,6 +5,20 @@ import type { Request, Response } from 'express';
 import type { ApiErrorResponseDTO } from '../dto/api-error-response.dto.js';
 import { getSafeExceptionDetails } from './safe-exception-details.js';
 
+// body-parser rechaza cuerpos grandes o mal codificados con errores 4xx que no son HttpException.
+// Su mensaje es seguro: describe la causa sin eco del contenido enviado.
+function isParserClientError(exception: unknown): exception is Error & { status: number } {
+  return (
+    exception instanceof Error &&
+    'status' in exception &&
+    typeof exception.status === 'number' &&
+    exception.status >= 400 &&
+    exception.status < 500 &&
+    'expose' in exception &&
+    exception.expose === true
+  );
+}
+
 // Unifica fallos de guards, pipes y services; los inesperados reciben mensaje genérico.
 @Catch()
 export class ApiExceptionFilter implements ExceptionFilter {
@@ -14,7 +28,12 @@ export class ApiExceptionFilter implements ExceptionFilter {
     const context = host.switchToHttp();
     const request = context.getRequest<Request>();
     const response = context.getResponse<Response>();
-    const statusCode = exception instanceof HttpException ? exception.getStatus() : 500;
+    const statusCode =
+      exception instanceof HttpException
+        ? exception.getStatus()
+        : isParserClientError(exception)
+          ? exception.status
+          : 500;
     let messages = ['Internal server error.'];
 
     // Diagnostica el fallo original sin entregar al logger la excepción ni la petición.
@@ -42,6 +61,8 @@ export class ApiExceptionFilter implements ExceptionFilter {
       ) {
         messages = message;
       }
+    } else if (isParserClientError(exception)) {
+      messages = [exception.message];
     } else if (statusCode === 503) {
       messages = ['Service temporarily unavailable.'];
     }
