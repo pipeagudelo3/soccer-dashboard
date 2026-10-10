@@ -258,21 +258,16 @@ function loadState(): LoadedPiniaState {
 }
 
 // Keep backend tokens out of browser storage without changing existing domain persistence.
-function withoutAccessToken(state: Record<string, StateTree>): Record<string, StateTree> {
-  if (!isRecord(state.auth)) {
-    return state;
-  }
-
-  const authState = { ...state.auth };
-  delete authState.accessToken;
-
-  return { ...state, auth: authState };
+function withoutAuthState(state: Record<string, StateTree>): Record<string, StateTree> {
+  const persistedState = { ...state };
+  delete persistedState.auth;
+  return persistedState;
 }
 
 function persistState(state: Record<string, StateTree>): void {
   const persistedState: PersistedPiniaState = {
     version: persistedStateVersion,
-    state: withoutAccessToken(state),
+    state: withoutAuthState(state),
   };
 
   try {
@@ -284,15 +279,8 @@ function persistState(state: Record<string, StateTree>): void {
 
 export function configurePinia(pinia: Pinia): void {
   const loadedState = loadState();
-  const safeState = withoutAccessToken(loadedState.state);
-  // Setup-store hydration expects the new ref to exist even in snapshots created before #50.
-  pinia.state.value = {
-    ...safeState,
-    auth: {
-      ...(isRecord(safeState.auth) ? safeState.auth : { currentUser: null }),
-      accessToken: null,
-    },
-  };
+  // Old local identities cannot grant backend access after a reload.
+  pinia.state.value = withoutAuthState(loadedState.state);
 
   if (!loadedState.canPersist) {
     return;

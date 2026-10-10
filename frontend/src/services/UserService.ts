@@ -91,7 +91,6 @@ export class UserService {
     };
 
     useUserStore().updateUser(updatedUser);
-    AuthService.synchronizeCurrentUser(updatedUser);
 
     return { success: true, data: updatedUser };
   }
@@ -114,15 +113,9 @@ export class UserService {
       return { success: false, errors: ['The last administrator cannot be deleted.'] };
     }
 
-    const deletedCurrentUser = AuthService.getCurrentUser()?.id === existingUser.id;
-
     useUserStore().removeUser(id);
-
-    if (deletedCurrentUser) {
-      AuthService.logout();
-    }
-
-    return { success: true, data: { deletedCurrentUser } };
+    // This local CRUD cannot modify or revoke the authenticated backend account; #55 migrates it.
+    return { success: true, data: { deletedCurrentUser: false } };
   }
 
   private static normalizePayload(payload: CreateUserDTO): CreateUserDTO {

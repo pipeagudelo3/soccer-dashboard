@@ -4,21 +4,22 @@ import { useRoute, useRouter } from 'vue-router';
 
 import type { LoginDTO } from '@/dtos/LoginDTO.js';
 import { AuthService } from '@/services/AuthService.js';
+import { resolveLoginRedirect } from '@/router/authenticationGuard.js';
+import { useAuthStore } from '@/stores/authstore.js';
 
 const router = useRouter();
 const route = useRoute();
+const authStore = useAuthStore();
 
 const email = ref('');
 const password = ref('');
 const errorMessage = ref<string | null>(null);
 const isSubmitting = ref(false);
 
-function resolveRedirectTarget(): string {
-  const redirect = route.query.redirect;
-  return typeof redirect === 'string' && redirect.length > 0 ? redirect : '/dashboard';
-}
-
 async function handleSubmit(): Promise<void> {
+  if (isSubmitting.value) {
+    return;
+  }
   errorMessage.value = null;
   isSubmitting.value = true;
 
@@ -27,16 +28,17 @@ async function handleSubmit(): Promise<void> {
     password: password.value,
   };
 
-  const result = AuthService.login(credentials);
-
-  isSubmitting.value = false;
-
-  if (!result.success) {
-    errorMessage.value = result.errors[0] ?? 'Unable to log in.';
-    return;
+  try {
+    const result = await AuthService.login(credentials);
+    password.value = '';
+    if (!result.success) {
+      errorMessage.value = result.errors[0] ?? 'Unable to log in.';
+      return;
+    }
+    await router.replace(resolveLoginRedirect(router, route.query.redirect));
+  } finally {
+    isSubmitting.value = false;
   }
-
-  await router.push(resolveRedirectTarget());
 }
 </script>
 
@@ -48,24 +50,39 @@ async function handleSubmit(): Promise<void> {
 
       <label>
         <span>Email</span>
-        <input v-model="email" type="email" autocomplete="username" required />
+        <input
+          v-model="email"
+          type="email"
+          autocomplete="username"
+          :disabled="isSubmitting"
+          required
+        />
       </label>
 
       <label>
         <span>Password</span>
-        <input v-model="password" type="password" autocomplete="current-password" required />
+        <input
+          v-model="password"
+          type="password"
+          autocomplete="current-password"
+          :disabled="isSubmitting"
+          required
+        />
       </label>
 
       <p v-if="errorMessage" class="error-message" role="alert">{{ errorMessage }}</p>
+      <p v-else-if="authStore.sessionError" class="error-message" role="alert">
+        {{ authStore.sessionError }}
+      </p>
 
       <button type="submit" class="submit-button" :disabled="isSubmitting">
         {{ isSubmitting ? 'Signing in...' : 'Log in' }}
       </button>
 
       <p class="demo-credentials">
-        Demo accounts &mdash; admin: <code>admin@soccerdashboard.test</code> /
-        <code>Admin123!</code>, user: <code>analyst@soccerdashboard.test</code> /
-        <code>User123!</code>
+        Backend demo accounts &mdash; admin: <code>admin@soccer.example</code> /
+        <code>AdminDemo123</code>, user: <code>user@soccer.example</code> /
+        <code>UserDemo123</code>. Run the backend seed first; changed credentials remain unchanged.
       </p>
     </form>
   </section>

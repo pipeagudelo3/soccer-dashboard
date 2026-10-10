@@ -1,6 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router';
 
-import { useAuthStore } from '@/stores/authstore.js';
+import { authenticationGuard } from '@/router/authenticationGuard.js';
 import HomeView from '@/views/HomeView.vue';
 
 const router = createRouter({
@@ -108,23 +108,7 @@ const router = createRouter({
 });
 
 // Enforce the access requirements declared in each route's metadata.
-router.beforeEach((to) => {
-  const authStore = useAuthStore();
-
-  if (to.name === 'login' && authStore.isAuthenticated) {
-    return { name: 'dashboard' };
-  }
-
-  if (to.meta.requiresAuth === true && !authStore.isAuthenticated) {
-    return { name: 'login', query: { redirect: to.fullPath } };
-  }
-
-  if (to.meta.requiresAdmin === true && !authStore.isAdmin) {
-    return { name: 'dashboard' };
-  }
-
-  return true;
-});
+router.beforeEach(authenticationGuard);
 
 router.afterEach((to) => {
   const pageTitle = typeof to.meta.title === 'string' ? to.meta.title : null;
