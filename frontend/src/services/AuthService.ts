@@ -138,7 +138,9 @@ export class AuthService {
     return useAuthStore().isAdmin;
   }
 
-  static reconcileSession(): Promise<ServiceResult<AuthenticatedUserInterface | null>> {
+  static reconcileSession(
+    options: { background?: boolean } = {},
+  ): Promise<ServiceResult<AuthenticatedUserInterface | null>> {
     const store = useAuthStore();
     const token = store.accessToken;
     if (token === null || store.expiresAt === null || store.expiresAt <= Date.now()) {
@@ -146,11 +148,13 @@ export class AuthService {
       return Promise.resolve({ success: true, data: null });
     }
 
+    // Post-write/403 checks update identity without unmounting the active form.
+    // Route guards still use blocking reconciliation before exposing protected content.
+    if (!options.background) store.startSessionCheck();
     const pending = AuthService.checks.get(store);
     if (pending?.token === token && pending.version === store.sessionVersion) return pending.result;
 
     const version = store.sessionVersion;
-    store.startSessionCheck();
     const result = AuthService.checkCurrentUser(store, token, version);
     AuthService.checks.set(store, { token, version, result });
     return result;

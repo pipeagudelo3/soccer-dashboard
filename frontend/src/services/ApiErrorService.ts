@@ -24,6 +24,10 @@ function readBackendMessages(value: unknown, status: number): string[] | null {
 }
 
 export class ApiErrorService {
+  static getStatusCode(error: unknown): number | undefined {
+    return axios.isAxiosError(error) ? error.response?.status : undefined;
+  }
+
   static getMessages(error: unknown, requiresAuth: boolean): string[] {
     if (!axios.isAxiosError<unknown>(error)) {
       return ['Unable to complete the request. Please try again.'];

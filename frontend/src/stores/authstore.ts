@@ -85,6 +85,7 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   function setSessionError(message: string): void {
+    isSessionVerified.value = false;
     sessionError.value = message;
   }
 

@@ -1,27 +1,44 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
-import { useRouter } from 'vue-router';
+import { computed, onMounted, onScopeDispose, ref } from 'vue';
 
 import DataTable from '@/components/DataTable.vue';
 import OperationFeedback from '@/components/OperationFeedback.vue';
 import PageHeader from '@/components/PageHeader.vue';
 import UserFormPanel from '@/components/UserFormPanel.vue';
-import type { CreateUserDTO } from '@/dtos/CreateUserDTO.js';
-import type { UpdateUserDTO } from '@/dtos/UpdateUserDTO.js';
-import type { UserInterface } from '@/interfaces/UserInterface.js';
-import type { ServiceResult } from '@/services/ServiceResult.js';
-import { UserService } from '@/services/UserService.js';
+import { useUserAdministration } from '@/composables/useUserAdministration.js';
 import { useAuthStore } from '@/stores/authstore.js';
 import { confirmDeletion, showError, showSuccess } from '@/utils/notifications.js';
 
-const router = useRouter();
 const authStore = useAuthStore();
-
-const users = computed(() => UserService.getUsers());
-const isFormOpen = ref(false);
-const editingUser = ref<UserInterface | null>(null);
-const feedbackErrors = ref<string[]>([]);
-const feedbackMessage = ref<string | null>(null);
+const {
+  users,
+  isLoading,
+  hasLoaded,
+  loadErrors,
+  feedbackErrors,
+  feedbackMessage,
+  isFormOpen,
+  editingUser,
+  isSaving,
+  pendingUserId,
+  isEditingStale,
+  isBusy,
+  loadUsers,
+  openCreateForm,
+  openEditForm,
+  closeForm,
+  createUser,
+  updateUser,
+  deleteUser,
+} = useUserAdministration();
+const isConfirmingDeletion = ref(false);
+let isDisposed = false;
+onScopeDispose(() => {
+  isDisposed = true;
+});
+const areActionsDisabled = computed(
+  () => isBusy.value || isConfirmingDeletion.value || !authStore.isAdmin,
+);
 
 const userColumns = [
   { key: 'name', label: 'Name' },
@@ -31,17 +48,11 @@ const userColumns = [
   { key: 'updatedAt', label: 'Updated' },
   { key: 'actions', label: 'Actions', align: 'right' as const },
 ];
-
 const dateFormatter = new Intl.DateTimeFormat('en', {
   year: 'numeric',
   month: 'short',
   day: 'numeric',
 });
-
-const administratorCount = computed(
-  () => users.value.filter((user) => user.role === 'admin').length,
-);
-
 const userRows = computed(() =>
   users.value.map((user) => ({
     id: user.id,
@@ -50,98 +61,31 @@ const userRows = computed(() =>
     role: user.role === 'admin' ? 'Administrator' : 'User',
     createdAt: dateFormatter.format(new Date(user.createdAt)),
     updatedAt: dateFormatter.format(new Date(user.updatedAt)),
-    isLastAdministrator: user.role === 'admin' && administratorCount.value === 1,
   })),
 );
 
-function clearFeedback(): void {
-  feedbackErrors.value = [];
-  feedbackMessage.value = null;
-}
+onMounted(() => {
+  void loadUsers();
+});
 
-function openCreateForm(): void {
-  editingUser.value = null;
-  clearFeedback();
-  isFormOpen.value = true;
-}
-
-function openEditForm(userId: string): void {
-  editingUser.value = UserService.getUserById(userId) ?? null;
-  clearFeedback();
-  isFormOpen.value = editingUser.value !== null;
-}
-
-function closeForm(): void {
-  isFormOpen.value = false;
-  editingUser.value = null;
-  feedbackErrors.value = [];
-}
-
-function handleResult<T>(result: ServiceResult<T>, successMessage: string): boolean {
-  if (!result.success) {
-    feedbackErrors.value = result.errors;
-    feedbackMessage.value = null;
-    return false;
-  }
-
-  feedbackErrors.value = [];
-  feedbackMessage.value = successMessage;
-  isFormOpen.value = false;
-  editingUser.value = null;
-  return true;
-}
-
-function handleCreate(payload: CreateUserDTO): void {
-  handleResult(UserService.createUser(payload), 'User created successfully.');
-}
-
-async function handleUpdate(payload: UpdateUserDTO): Promise<void> {
-  if (editingUser.value === null) {
-    return;
-  }
-
-  const result = UserService.updateUser(editingUser.value.id, payload);
-
-  if (!handleResult(result, 'User updated successfully.')) {
-    return;
-  }
-
-  if (!authStore.isAdmin) {
-    await router.replace({ name: 'dashboard' });
-  }
-}
-
-async function handleDelete(userId: string): Promise<void> {
-  const user = UserService.getUserById(userId);
-
-  if (user === undefined) {
-    await showError('The selected user no longer exists.');
-    return;
-  }
-
-  const confirmed = await confirmDeletion(user.name);
-
-  if (!confirmed) {
-    return;
-  }
-
-  const result = UserService.deleteUser(userId);
-
-  if (!result.success) {
-    feedbackErrors.value = [];
-    feedbackMessage.value = null;
-    await showError(result.errors.join(' ') || 'This user could not be deleted.');
-    return;
-  }
-
-  feedbackErrors.value = [];
-  feedbackMessage.value = null;
-  isFormOpen.value = false;
-  editingUser.value = null;
-  await showSuccess('User deleted successfully.');
-
-  if (result.data.deletedCurrentUser) {
-    await router.replace({ name: 'login' });
+async function handleDelete(id: string): Promise<void> {
+  if (areActionsDisabled.value) return;
+  const user = users.value.find((record) => record.id === id);
+  if (user === undefined) return;
+  const token = authStore.accessToken;
+  isConfirmingDeletion.value = true;
+  try {
+    if (!(await confirmDeletion(user.name))) return;
+    // A pending dialog belongs to the page and session that opened it.
+    if (isDisposed || token !== authStore.accessToken || !authStore.isAdmin) return;
+    const result = await deleteUser(id);
+    if (!result.success) {
+      await showError(result.errors.join(' ') || 'This user could not be deleted.');
+      return;
+    }
+    await showSuccess('User deleted successfully.');
+  } finally {
+    isConfirmingDeletion.value = false;
   }
 }
 </script>
@@ -153,21 +97,74 @@ async function handleDelete(userId: string): Promise<void> {
       description="Create and manage the users authorized to access the dashboard."
     >
       <template #actions>
-        <button type="button" class="button-primary" @click="openCreateForm">Add user</button>
+        <button
+          type="button"
+          class="button-secondary"
+          :disabled="areActionsDisabled"
+          @click="loadUsers"
+        >
+          Reload users
+        </button>
+        <button
+          type="button"
+          class="button-primary"
+          :disabled="areActionsDisabled"
+          @click="openCreateForm"
+        >
+          Add user
+        </button>
       </template>
     </PageHeader>
 
-    <OperationFeedback :errors="feedbackErrors" :success-message="feedbackMessage" />
+    <OperationFeedback
+      :errors="isFormOpen ? [] : feedbackErrors"
+      :success-message="feedbackMessage"
+    />
 
     <UserFormPanel
       v-if="isFormOpen"
+      :key="editingUser?.id ?? 'create'"
       :editing-user="editingUser"
-      @create="handleCreate"
-      @update="handleUpdate"
+      :errors="feedbackErrors"
+      :is-submitting="isSaving"
+      :is-disabled="isLoading || pendingUserId !== null || isConfirmingDeletion"
+      :is-stale="isEditingStale"
+      @create="createUser"
+      @update="updateUser"
       @cancel="closeForm"
     />
 
+    <div v-if="isEditingStale" class="load-state" role="alert">
+      <p>
+        This record is no longer available. Your draft remains open; cancel it or reload the record.
+      </p>
+      <button
+        type="button"
+        class="button-secondary"
+        :disabled="areActionsDisabled"
+        @click="editingUser && openEditForm(editingUser.id)"
+      >
+        Reload selected user
+      </button>
+    </div>
+
+    <p v-if="isLoading" class="load-state" role="status" aria-live="polite">Loading users...</p>
+    <p v-if="pendingUserId" role="status" aria-live="polite">Processing the selected user...</p>
+    <div v-if="loadErrors.length > 0" class="load-state" role="alert">
+      <OperationFeedback :errors="loadErrors" />
+      <p v-if="hasLoaded">Previously loaded data may be outdated.</p>
+      <button
+        type="button"
+        class="button-secondary"
+        :disabled="areActionsDisabled"
+        @click="loadUsers"
+      >
+        Retry loading users
+      </button>
+    </div>
+
     <DataTable
+      v-if="hasLoaded && !isLoading"
       :columns="userColumns"
       :rows="userRows"
       row-key="id"
@@ -175,23 +172,24 @@ async function handleDelete(userId: string): Promise<void> {
       empty-message="No users are available."
     >
       <template #cell-role="{ value }">
-        <span :class="['role-badge', value === 'Administrator' ? 'role-admin' : 'role-user']">
-          {{ value }}
-        </span>
+        <span :class="['role-badge', value === 'Administrator' ? 'role-admin' : 'role-user']">{{
+          value
+        }}</span>
       </template>
-
       <template #cell-actions="{ row }">
         <div class="row-actions">
-          <button type="button" class="link-button" @click="openEditForm(String(row.id))">
+          <button
+            type="button"
+            class="link-button"
+            :disabled="areActionsDisabled"
+            @click="openEditForm(String(row.id))"
+          >
             Edit
           </button>
           <button
             type="button"
             class="link-button danger"
-            :disabled="Boolean(row.isLastAdministrator)"
-            :title="
-              row.isLastAdministrator ? 'The last administrator cannot be deleted.' : undefined
-            "
+            :disabled="areActionsDisabled"
             @click="handleDelete(String(row.id))"
           >
             Delete
@@ -199,9 +197,8 @@ async function handleDelete(userId: string): Promise<void> {
         </div>
       </template>
     </DataTable>
-
     <p class="security-note">
-      Passwords are never displayed. At least one administrator must remain in the application.
+      Passwords are never displayed. The server protects the last administrator.
     </p>
   </div>
 </template>
@@ -211,6 +208,27 @@ async function handleDelete(userId: string): Promise<void> {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+}
+
+.button-secondary {
+  padding: 0.6rem 1.1rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.5rem;
+  background: #ffffff;
+  color: #475569;
+  cursor: pointer;
+}
+
+.load-state {
+  padding: 1rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+}
+
+.button-primary:disabled,
+.button-secondary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .button-primary {

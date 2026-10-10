@@ -17,7 +17,6 @@ let stores: typeof import('../src/stores/authstore.js');
 let guards: typeof import('../src/router/authenticationGuard.js');
 let navigation: typeof import('../src/router/sessionNavigation.js');
 let persistence: typeof import('../src/PiniaConfig.js');
-let users: typeof import('../src/services/UserService.js');
 let userStores: typeof import('../src/stores/userstore.js');
 let api: typeof import('../src/services/ApiService.js');
 let handler: (request: IncomingMessage, response: ServerResponse) => void;
@@ -89,7 +88,7 @@ before(async () => {
   vite = await createServer({
     configFile: false,
     mode: 'test',
-    server: { middlewareMode: true, watch: null },
+    server: { middlewareMode: true, watch: null, hmr: false, ws: false },
     resolve: { alias: { '@': fileURLToPath(new URL('../src', import.meta.url)) } },
   });
   auth = (await vite.ssrLoadModule('/src/services/AuthService.ts')) as typeof auth;
@@ -97,7 +96,6 @@ before(async () => {
   guards = (await vite.ssrLoadModule('/src/router/authenticationGuard.ts')) as typeof guards;
   navigation = (await vite.ssrLoadModule('/src/router/sessionNavigation.ts')) as typeof navigation;
   persistence = (await vite.ssrLoadModule('/src/PiniaConfig.ts')) as typeof persistence;
-  users = (await vite.ssrLoadModule('/src/services/UserService.ts')) as typeof users;
   userStores = (await vite.ssrLoadModule('/src/stores/userstore.ts')) as typeof userStores;
   api = (await vite.ssrLoadModule('/src/services/ApiService.ts')) as typeof api;
 });
@@ -189,7 +187,6 @@ test('rejects fictional local credentials and never authenticates against userst
       id: userId,
       name: 'Local Admin',
       email: 'local@example.test',
-      password: 'Local123!',
       role: 'admin',
       createdAt: 'test',
       updatedAt: 'test',
@@ -199,7 +196,11 @@ test('rejects fictional local credentials and never authenticates against userst
     email: 'local@example.test',
     password: 'Local123!',
   });
-  assert.deepEqual(result, { success: false, errors: ['Invalid email or password.'] });
+  assert.deepEqual(result, {
+    success: false,
+    errors: ['Invalid email or password.'],
+    statusCode: 401,
+  });
   assert.equal(auth.AuthService.isAuthenticated(), false);
   assert.equal(requestCount, 1);
   assert.equal((await loginAsUser()).success, true);
@@ -211,6 +212,7 @@ for (const email of ['missing@soccer.example', 'user@soccer.example']) {
     assert.deepEqual(await auth.AuthService.login({ email, password: 'incorrect' }), {
       success: false,
       errors: ['Invalid email or password.'],
+      statusCode: 401,
     });
     assert.equal(stores.useAuthStore().accessToken, null);
   });
@@ -349,8 +351,7 @@ test('local user edits/deletions cannot change the backend-authenticated profile
     id: adminId,
     name: 'Local Copy',
     email: 'copy@example.test',
-    password: 'Local123!',
-    role: 'admin',
+    role: 'admin' as const,
     createdAt: 'test',
     updatedAt: 'test',
   };
@@ -358,13 +359,10 @@ test('local user edits/deletions cannot change the backend-authenticated profile
     stored,
     { ...stored, id: userId, email: 'other@example.test' },
   ];
-  assert.equal(
-    users.UserService.updateUser(adminId, { name: 'Local Edit', role: 'user' }).success,
-    true,
-  );
+  userStores.useUserStore().updateUser({ ...stored, name: 'Local Edit', role: 'user' });
   assert.equal(auth.AuthService.getCurrentUser()?.name, 'Backend Admin');
   assert.equal(auth.AuthService.isAdmin(), true);
-  assert.equal(users.UserService.deleteUser(adminId).success, true);
+  userStores.useUserStore().removeUser(adminId);
   assert.equal(auth.AuthService.isAuthenticated(), true);
 });
 

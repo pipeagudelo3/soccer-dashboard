@@ -35,7 +35,7 @@ before(async () => {
   vite = await createServer({
     configFile: false,
     mode: 'test',
-    server: { middlewareMode: true, watch: null },
+    server: { middlewareMode: true, watch: null, hmr: false, ws: false },
     resolve: { alias: { '@': fileURLToPath(new URL('../src', import.meta.url)) } },
   });
   api = (await vite.ssrLoadModule('/src/services/ApiService.ts')) as typeof api;
@@ -167,6 +167,7 @@ test('invalid public login does not send a token or clear an existing session', 
     {
       success: false,
       errors: ['Invalid email or password.'],
+      statusCode: 401,
     },
   );
   assert.equal(store.accessToken, 'academic-test-token');
@@ -221,6 +222,7 @@ for (const [status, expected] of [
     assert.deepEqual(await api.ApiService.request({ url: '/teams' }), {
       success: false,
       errors: [expected],
+      statusCode: status,
     });
     assert.equal(store.accessToken, 'academic-test-token');
   });
@@ -232,6 +234,7 @@ for (const status of [400, 409, 422]) {
     assert.deepEqual(await api.ApiService.request({ url: '/teams' }), {
       success: false,
       errors: ['Invalid team.', 'Invalid name.'],
+      statusCode: status,
     });
   });
 }
@@ -241,6 +244,7 @@ test('handles malformed error envelopes predictably', async () => {
   assert.deepEqual(await api.ApiService.request({ url: '/teams' }), {
     success: false,
     errors: ['Check the submitted data.'],
+    statusCode: 400,
   });
 });
 
