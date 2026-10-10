@@ -214,7 +214,7 @@ A successful write is not reported as failed merely because a later profile chec
 
 ### Validation and manual evaluation
 
-`npm run verify` includes 80 tests: 24 transport, 23 authentication/navigation and 33 Users service,
+`npm run verify` includes 83 tests: 24 transport, 23 authentication/navigation and 36 Users service,
 page-state and form-rendering tests. They cover DTO serialization, safe responses, permissions,
 validation/conflicts, loading/retry/empty states, stale records, races, self-update/self-delete,
 legacy snapshot exclusion and preservation of inline form feedback. Test Vite servers disable
@@ -235,18 +235,25 @@ navigation is blocked. Keep the memory-only token rule from #39: a full reload r
 These manual steps are provided for the contributor; automated and real API checks are recorded
 separately and do not claim a desktop-browser session was performed.
 
-### Dependency audit at implementation time
+### Formatting and dependency audit
 
-On 2026-10-08 UTC (2026-10-07 in Colombia), compatible lockfile updates resolved the findings in Vue,
-source-map-js and shell-quote. The production audit (`npm audit --omit=dev`) reports zero
-vulnerabilities. The full audit still reports four high findings in the existing development chain
+Frontend text files use LF, matching the default of the shared `.prettierrc.json`.
+The repository `.gitattributes` enforces `frontend/** text=auto eol=lf`, so Windows
+checkouts remain compatible with `npm run format:check` even with `core.autocrlf=true`.
+Keep the official Prettier configuration; do not bypass the check with `--end-of-line auto`.
+
+The previous high-severity development chain was
 `@vue/eslint-config-typescript → fast-glob → micromatch → braces`.
+ESLint now uses the official `typescript-eslint` configuration directly with
+`eslint-plugin-vue` and the existing Vue/Prettier configuration. `typescript-eslint`
+was already installed transitively; it is now an explicit development dependency at
+the same version. The Vue SFC parser and the TypeScript-only script requirement remain.
+The effective rules for TypeScript, Vue and JavaScript were compared before and after
+and match. No runtime dependency or HTTP behavior changes.
 
-[GHSA-vfj7-8cjw-p6xm](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm) has no published patched
-version of braces. npm proposes an incompatible downgrade of the Vue ESLint configuration via
-`npm audit fix --force`; it was not applied. The full-audit acceptance criterion therefore remains
-pending a reviewed toolchain change or an explicit team decision. This is separate from the HTTP
-client tests and does not mean the full audit passed.
+On 2026-10-09, both `npm audit` and `npm audit --omit=dev` reported zero vulnerabilities.
+The vulnerable glob chain was removed instead of downgrading ESLint, hiding advisories
+or using `npm audit fix --force`. Run both audits again when dependencies change.
 
 The global font-weight reset remains unchanged in this phase to avoid an application-wide visual
 change; it should be reviewed as part of the next visual consistency phase.
