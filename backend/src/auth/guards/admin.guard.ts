@@ -1,16 +1,17 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
-import type { CanActivate, ExecutionContext } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import type { ExecutionContext } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 
-import type { AuthenticatedRequestInterface } from '../interfaces/authenticated-user.interface.js';
+import { RolesGuard } from './roles.guard.js';
 
-// Debe ejecutarse después de JwtAuthGuard: el rol procede del registro vigente.
+// Adaptador para entregas anteriores; delega la regla y no duplica autorización.
 @Injectable()
-export class AdminGuard implements CanActivate {
-  canActivate(context: ExecutionContext): boolean {
-    const request = context.switchToHttp().getRequest<AuthenticatedRequestInterface>();
-    if (request.user?.role !== 'admin') {
-      throw new ForbiddenException('Administrator access is required.');
-    }
-    return true;
+export class AdminGuard extends RolesGuard {
+  constructor(reflector: Reflector) {
+    super(reflector);
+  }
+
+  override canActivate(context: ExecutionContext): boolean {
+    return this.requireRoles(context, ['admin']);
   }
 }

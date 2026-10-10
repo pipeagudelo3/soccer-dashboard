@@ -1,18 +1,12 @@
 import { applyDecorators } from '@nestjs/common';
-import { Transform } from 'class-transformer';
-import { IsNotEmpty, IsString, IsUrl, ValidateBy } from 'class-validator';
+import { IsUrl } from 'class-validator';
 
-import { isPastOrPresentCivilDate } from '../../common/validation/civil-date.validator.js';
+import { PastOrPresentDate } from '../../common/validation/past-or-present-date.decorator.js';
+import { TrimmedText } from '../../common/validation/trimmed-text.decorator.js';
 
 // Comparte trim y validación de texto entre POST y PATCH; no convierte otros tipos.
 export function TeamText(): PropertyDecorator {
-  return applyDecorators(
-    Transform(({ value }: { value: unknown }) =>
-      typeof value === 'string' ? value.trim() : value,
-    ),
-    IsString(),
-    IsNotEmpty(),
-  );
+  return TrimmedText();
 }
 
 // Solo acepta URLs absolutas HTTP/HTTPS; la API almacena la URL, nunca la descarga.
@@ -30,15 +24,5 @@ export function TeamLogoURL(): PropertyDecorator {
 
 // Usa el calendario real y el día UTC actual, manteniendo el string YYYY-MM-DD.
 export function TeamFoundedDate(): PropertyDecorator {
-  return applyDecorators(
-    TeamText(),
-    ValidateBy({
-      name: 'pastOrPresentCivilDate',
-      validator: {
-        validate: (value: unknown): boolean => isPastOrPresentCivilDate(value),
-        defaultMessage: () =>
-          'foundedDate must be a real YYYY-MM-DD date that is not in the future',
-      },
-    }),
-  );
+  return PastOrPresentDate();
 }

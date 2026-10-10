@@ -13,7 +13,8 @@ import {
   UseGuards,
 } from '@nestjs/common';
 
-import { AdminGuard } from '../auth/guards/admin.guard.js';
+import { Roles } from '../auth/decorators/roles.decorator.js';
+import { RolesGuard } from '../auth/guards/roles.guard.js';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 import type { AuthenticatedRequestInterface } from '../auth/interfaces/authenticated-user.interface.js';
 import { CreateUserDTO } from './dto/create-user.dto.js';
@@ -21,9 +22,10 @@ import { UpdateUserDTO } from './dto/update-user.dto.js';
 import type { UserResponseDTO } from './dto/user-response.dto.js';
 import { UsersService } from './users.service.js';
 
-// Todos los endpoints exigen admin, incluida la consulta propia. /auth/me será #47.
+// Todos los endpoints exigen admin, incluida la consulta propia. /auth/me permite consultar el perfil propio con sesión válida.
 @Controller('users')
-@UseGuards(JwtAuthGuard, AdminGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('admin')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 

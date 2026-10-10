@@ -3,7 +3,7 @@ import { compare, hash } from 'bcryptjs';
 
 import { isValidPassword } from './password-policy.js';
 
-// Centraliza la política de hash para los próximos módulos de usuarios, seed y auth.
+// Centraliza la política de hash para usuarios, seed y auth.
 @Injectable()
 export class PasswordService {
   async hashPassword(password: string): Promise<string> {

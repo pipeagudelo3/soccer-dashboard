@@ -13,7 +13,8 @@ import {
   UseGuards,
 } from '@nestjs/common';
 
-import { AdminGuard } from '../auth/guards/admin.guard.js';
+import { Roles } from '../auth/decorators/roles.decorator.js';
+import { RolesGuard } from '../auth/guards/roles.guard.js';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 import type { AuthenticatedRequestInterface } from '../auth/interfaces/authenticated-user.interface.js';
 import { CreateTeamDTO } from './dto/create-team.dto.js';
@@ -39,7 +40,8 @@ export class TeamsController {
 
   // Los DTOs validan la entrada y el servicio decide las reglas; POST devuelve 201.
   @Post()
-  @UseGuards(AdminGuard)
+  @UseGuards(RolesGuard)
+  @Roles('admin')
   create(
     @Body() dto: CreateTeamDTO,
     @Req() request: AuthenticatedRequestInterface,
@@ -48,7 +50,8 @@ export class TeamsController {
   }
 
   @Patch(':id')
-  @UseGuards(AdminGuard)
+  @UseGuards(RolesGuard)
+  @Roles('admin')
   update(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Body() dto: UpdateTeamDTO,
@@ -60,7 +63,8 @@ export class TeamsController {
   // El contrato conserva 204 sin cuerpo cuando la eliminación está permitida.
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @UseGuards(AdminGuard)
+  @UseGuards(RolesGuard)
+  @Roles('admin')
   remove(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Req() request: AuthenticatedRequestInterface,

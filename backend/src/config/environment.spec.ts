@@ -1,4 +1,4 @@
-import { validateEnvironment } from './environment.js';
+import { getJwtExpirationSeconds, validateEnvironment } from './environment.js';
 
 // Credencial ficticia y exclusiva de pruebas; nunca se usa para iniciar el servidor real.
 const testEnvironment: Record<string, unknown> = {
@@ -54,6 +54,9 @@ describe('validateEnvironment', () => {
     ['JWT_SECRET', 'short'],
     ['JWT_EXPIRES_IN', '0m'],
     ['JWT_EXPIRES_IN', 'invalid'],
+    ['JWT_EXPIRES_IN', '2h'],
+    ['JWT_EXPIRES_IN', '3601s'],
+    ['JWT_EXPIRES_IN', '999999999999999999999m'],
     ['SQLITE_PATH', ''],
     ['SQLITE_SYNCHRONIZE', 'invalid'],
     ['CORS_ORIGIN', '*'],
@@ -79,5 +82,13 @@ describe('validateEnvironment', () => {
     expect(() => validateEnvironment({ ...testEnvironment, NODE_ENV: 'production' })).toThrow(
       'CORS_ORIGIN',
     );
+  });
+
+  it.each([
+    ['1s', 1],
+    ['15m', 900],
+    ['1h', 3600],
+  ])('converts %s into seconds', (value, seconds) => {
+    expect(getJwtExpirationSeconds(String(value))).toBe(seconds);
   });
 });

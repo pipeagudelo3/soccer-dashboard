@@ -1,0 +1,2 @@
+# Keep frontend checkouts consistent with the shared Prettier LF default on every OS.
+frontend/** text=auto eol=lf
