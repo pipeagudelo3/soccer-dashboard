@@ -1,17 +1,30 @@
 <script setup lang="ts">
-import { RouterView } from 'vue-router';
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
+import { RouterView, useRoute } from 'vue-router';
 
 import AppHeader from '@/components/AppHeader.vue';
 import { useAuthStore } from '@/stores/authstore.js';
 
 const mainContent = ref<HTMLElement | null>(null);
 const authStore = useAuthStore();
+const route = useRoute();
 
 function focusMainContent(): void {
   mainContent.value?.focus({ preventScroll: true });
   mainContent.value?.scrollIntoView({ block: 'start' });
 }
+
+const shouldRenderRouterView = computed<boolean>(() => {
+  if (authStore.isSessionLoading) {
+    return false;
+  }
+
+  if (route.meta.requiresAuth !== true) {
+    return true;
+  }
+
+  return authStore.isAuthenticated;
+});
 </script>
 
 <template>
@@ -20,13 +33,20 @@ function focusMainContent(): void {
       Skip to main content
     </a>
     <AppHeader
+      v-if="!authStore.isSessionLoading"
       :is-authenticated="authStore.isAuthenticated"
       :user-name="authStore.currentUser?.name ?? null"
       :user-role="authStore.currentUser?.role ?? null"
     />
 
     <main id="main-content" ref="mainContent" class="main-content" tabindex="-1">
-      <RouterView />
+      <p v-if="authStore.isSessionLoading" role="status" aria-live="polite">
+        Checking your session...
+      </p>
+      <RouterView v-else-if="shouldRenderRouterView" />
+      <p v-else-if="route.meta.requiresAuth === true && !authStore.isAuthenticated" role="status">
+        Redirecting to login...
+      </p>
     </main>
 
     <footer class="app-footer">

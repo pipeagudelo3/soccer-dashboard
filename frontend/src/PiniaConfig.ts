@@ -2,11 +2,7 @@ import type { Pinia, StateTree } from 'pinia';
 import { watch } from 'vue';
 
 import type { MatchStatsInterface } from '@/interfaces/MatchStatsInterface.js';
-import type { PlayerInterface } from '@/interfaces/PlayerInterface.js';
 import { matchStatsSeedData } from '@/stores/matchstatsseeder.js';
-import { playerSeedData } from '@/stores/playerseeder.js';
-import { teamSeedData } from '@/stores/teamseeder.js';
-import { userSeedData } from '@/stores/userseeder.js';
 
 export const piniaStateKey = 'piniaState';
 const legacyStateBackupKey = `${piniaStateKey}:v1:backup`;
@@ -72,38 +68,6 @@ function readTeamId(record: Record<string, unknown>, key: string): string | null
   return readString(legacyValue, 'id') ?? undefined;
 }
 
-function migratePlayer(value: unknown): PlayerInterface | null {
-  if (!isRecord(value)) {
-    return null;
-  }
-
-  const id = readString(value, 'id');
-  const name = readString(value, 'name');
-  const position = readString(value, 'position');
-  const status = readString(value, 'status');
-  const teamId = readTeamId(value, 'team');
-  const goals = readNumber(value, 'goals');
-  const assists = readNumber(value, 'assists');
-  const createdAt = readString(value, 'createdAt');
-  const updatedAt = readString(value, 'updatedAt');
-
-  if (
-    id === null ||
-    name === null ||
-    position === null ||
-    status === null ||
-    teamId === undefined ||
-    goals === null ||
-    assists === null ||
-    createdAt === null ||
-    updatedAt === null
-  ) {
-    return null;
-  }
-
-  return { id, name, position, status, teamId, goals, assists, createdAt, updatedAt };
-}
-
 function migrateMatchStats(value: unknown): MatchStatsInterface | null {
   if (!isRecord(value)) {
     return null;
@@ -154,32 +118,24 @@ function migrateMatchStats(value: unknown): MatchStatsInterface | null {
 function migrateLegacyState(
   legacyState: Record<string, StateTree>,
 ): Record<string, StateTree> | null {
-  const playersState = legacyState.players;
   const matchStatsState = legacyState.matchStats;
-
-  if (!isRecord(playersState) || !Array.isArray(playersState.players)) {
-    return null;
-  }
 
   if (!isRecord(matchStatsState) || !Array.isArray(matchStatsState.matchStats)) {
     return null;
   }
 
-  const players = playersState.players.map(migratePlayer);
   const matchStats = matchStatsState.matchStats.map(migrateMatchStats);
 
-  if (players.some((player) => player === null) || matchStats.some((match) => match === null)) {
+  if (matchStats.some((match) => match === null)) {
     return null;
   }
 
-  const migratedPlayers = players.filter((player): player is PlayerInterface => player !== null);
   const migratedMatchStats = matchStats.filter(
     (match): match is MatchStatsInterface => match !== null,
   );
 
   return {
     ...legacyState,
-    players: { ...playersState, players: migratedPlayers },
     matchStats: { ...matchStatsState, matchStats: migratedMatchStats },
   };
 }
@@ -187,13 +143,11 @@ function migrateLegacyState(
 function createInitialState(): Record<string, StateTree> {
   return {
     auth: { currentUser: null },
-    users: { users: userSeedData.map((user) => ({ ...user })) },
-    teams: { teams: teamSeedData.map((team) => ({ ...team })) },
-    players: { players: playerSeedData.map((player) => ({ ...player })) },
     matchStats: { matchStats: matchStatsSeedData.map((match) => ({ ...match })) },
   };
 }
 
+// Legacy parsing errors can quote old credentials; only stable diagnostics are logged.
 function backUpLegacyState(storedState: string): boolean {
   try {
     if (localStorage.getItem(legacyStateBackupKey) === null) {
@@ -201,8 +155,8 @@ function backUpLegacyState(storedState: string): boolean {
     }
 
     return true;
-  } catch (error: unknown) {
-    console.error('Unable to back up the legacy Pinia state in LocalStorage.', error);
+  } catch {
+    console.error('Unable to back up the legacy Pinia state in LocalStorage.');
     return false;
   }
 }
@@ -212,8 +166,8 @@ function loadState(): LoadedPiniaState {
 
   try {
     storedState = localStorage.getItem(piniaStateKey);
-  } catch (error: unknown) {
-    console.error('Unable to read the persisted Pinia state from LocalStorage.', error);
+  } catch {
+    console.error('Unable to read the persisted Pinia state from LocalStorage.');
     return { state: createInitialState(), canPersist: false };
   }
 
@@ -246,8 +200,8 @@ function loadState(): LoadedPiniaState {
     }
 
     console.error('The persisted Pinia state has an invalid format. Initial data will be used.');
-  } catch (error: unknown) {
-    console.error('Unable to parse or migrate the persisted Pinia state.', error);
+  } catch {
+    console.error('Unable to parse or migrate the persisted Pinia state.');
 
     if (!backUpLegacyState(storedState)) {
       return { state: createInitialState(), canPersist: false };
@@ -257,42 +211,33 @@ function loadState(): LoadedPiniaState {
   return { state: createInitialState(), canPersist: true };
 }
 
-// Keep backend tokens out of browser storage without changing existing domain persistence.
-function withoutAccessToken(state: Record<string, StateTree>): Record<string, StateTree> {
-  if (!isRecord(state.auth)) {
-    return state;
-  }
-
-  const authState = { ...state.auth };
-  delete authState.accessToken;
-
-  return { ...state, auth: authState };
+// Backend-owned auth, users, teams and players are never hydrated or persisted as a local database.
+function withoutBackendState(state: Record<string, StateTree>): Record<string, StateTree> {
+  const persistedState = { ...state };
+  delete persistedState.auth;
+  delete persistedState.users;
+  delete persistedState.teams;
+  delete persistedState.players;
+  return persistedState;
 }
 
 function persistState(state: Record<string, StateTree>): void {
   const persistedState: PersistedPiniaState = {
     version: persistedStateVersion,
-    state: withoutAccessToken(state),
+    state: withoutBackendState(state),
   };
 
   try {
     localStorage.setItem(piniaStateKey, JSON.stringify(persistedState));
-  } catch (error: unknown) {
-    console.error('Unable to persist the Pinia state in LocalStorage.', error);
+  } catch {
+    console.error('Unable to persist the Pinia state in LocalStorage.');
   }
 }
 
 export function configurePinia(pinia: Pinia): void {
   const loadedState = loadState();
-  const safeState = withoutAccessToken(loadedState.state);
-  // Setup-store hydration expects the new ref to exist even in snapshots created before #50.
-  pinia.state.value = {
-    ...safeState,
-    auth: {
-      ...(isRecord(safeState.auth) ? safeState.auth : { currentUser: null }),
-      accessToken: null,
-    },
-  };
+  // Old local identities cannot grant backend access after a reload.
+  pinia.state.value = withoutBackendState(loadedState.state);
 
   if (!loadedState.canPersist) {
     return;

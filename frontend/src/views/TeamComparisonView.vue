@@ -1,24 +1,33 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 
+import ApiLoadState from '@/components/ApiLoadState.vue';
+import { useTeamPlayerData } from '@/composables/useTeamPlayerData.js';
 import ChartCard from '@/components/ChartCard.vue';
 import DataTable from '@/components/DataTable.vue';
 import FilterSelect from '@/components/FilterSelect.vue';
 import PageHeader from '@/components/PageHeader.vue';
-import { MatchStatsService } from '@/services/MatchStatsService.js';
-import { PlayerService } from '@/services/PlayerService.js';
-import { TeamService } from '@/services/TeamService.js';
 import {
   calculateTeamComparisonIndicators,
   type TeamComparisonIndicators,
 } from '@/utils/teamComparison.js';
 
-const teams = computed(() => TeamService.getTeams());
-const players = computed(() => PlayerService.getPlayers());
-const matchStats = computed(() => MatchStatsService.getMatchStats());
+const { teams, players, matchStats, isLoading, hasLoaded, loadErrors, isReady, loadData } =
+  useTeamPlayerData(true);
 
 const firstTeamId = ref(teams.value[0]?.id ?? '');
 const secondTeamId = ref(teams.value[1]?.id ?? '');
+
+watch(teams, (records) => {
+  if (!records.some((team) => team.id === firstTeamId.value))
+    firstTeamId.value = records[0]?.id ?? '';
+  if (
+    !records.some((team) => team.id === secondTeamId.value) ||
+    secondTeamId.value === firstTeamId.value
+  ) {
+    secondTeamId.value = records.find((team) => team.id !== firstTeamId.value)?.id ?? '';
+  }
+});
 
 const firstTeamOptions = computed(() => [
   { label: 'Select first team', value: '' },
@@ -242,56 +251,66 @@ const goalsChart = computed(() => {
       title="Team comparison"
       description="Compare two teams using their players and recorded match statistics."
     />
-
-    <section class="team-selectors" aria-label="Teams to compare">
-      <FilterSelect v-model="firstTeamId" label="First team" :options="firstTeamOptions" />
-      <span class="versus-label" aria-hidden="true">VS</span>
-      <FilterSelect v-model="secondTeamId" label="Second team" :options="secondTeamOptions" />
-    </section>
-
-    <p v-if="teams.length < 2" class="feedback-message" role="status">
-      At least two teams are required to create a comparison.
-    </p>
-    <p v-else-if="!canCompare" class="feedback-message" role="status">
-      Select two different existing teams to view the comparison.
-    </p>
-
-    <template v-if="canCompare">
-      <section class="team-headings" aria-label="Selected teams">
-        <article class="team-heading">
-          <span class="team-order">First team</span>
-          <h2>{{ firstTeamIndicators?.team.name }}</h2>
-          <p>{{ firstTeamIndicators?.team.country }} · {{ firstTeamIndicators?.team.stadium }}</p>
-        </article>
-        <article class="team-heading">
-          <span class="team-order">Second team</span>
-          <h2>{{ secondTeamIndicators?.team.name }}</h2>
-          <p>{{ secondTeamIndicators?.team.country }} · {{ secondTeamIndicators?.team.stadium }}</p>
-        </article>
+    <ApiLoadState
+      :is-loading="isLoading"
+      :errors="loadErrors"
+      :has-loaded="hasLoaded"
+      :is-empty="teams.length === 0"
+      @retry="loadData"
+    />
+    <template v-if="isReady">
+      <section class="team-selectors" aria-label="Teams to compare">
+        <FilterSelect v-model="firstTeamId" label="First team" :options="firstTeamOptions" />
+        <span class="versus-label" aria-hidden="true">VS</span>
+        <FilterSelect v-model="secondTeamId" label="Second team" :options="secondTeamOptions" />
       </section>
 
-      <section class="charts-grid">
-        <ChartCard
-          title="Match results"
-          description="Wins, draws, and losses calculated for each selected team."
-          type="bar"
-          :data="matchResultsChart"
-        />
-        <ChartCard
-          title="Goals and assists"
-          description="Match goals and aggregated player contributions."
-          type="bar"
-          :data="goalsChart"
-        />
-      </section>
+      <p v-if="teams.length < 2" class="feedback-message" role="status">
+        At least two teams are required to create a comparison.
+      </p>
+      <p v-else-if="!canCompare" class="feedback-message" role="status">
+        Select two different existing teams to view the comparison.
+      </p>
 
-      <DataTable
-        :columns="comparisonColumns"
-        :rows="comparisonRows"
-        row-key="id"
-        caption="Statistical comparison of the two selected teams"
-        empty-message="No comparison data is available."
-      />
+      <template v-if="canCompare">
+        <section class="team-headings" aria-label="Selected teams">
+          <article class="team-heading">
+            <span class="team-order">First team</span>
+            <h2>{{ firstTeamIndicators?.team.name }}</h2>
+            <p>{{ firstTeamIndicators?.team.country }} · {{ firstTeamIndicators?.team.stadium }}</p>
+          </article>
+          <article class="team-heading">
+            <span class="team-order">Second team</span>
+            <h2>{{ secondTeamIndicators?.team.name }}</h2>
+            <p>
+              {{ secondTeamIndicators?.team.country }} · {{ secondTeamIndicators?.team.stadium }}
+            </p>
+          </article>
+        </section>
+
+        <section class="charts-grid">
+          <ChartCard
+            title="Match results"
+            description="Wins, draws, and losses calculated for each selected team."
+            type="bar"
+            :data="matchResultsChart"
+          />
+          <ChartCard
+            title="Goals and assists"
+            description="Match goals and aggregated player contributions."
+            type="bar"
+            :data="goalsChart"
+          />
+        </section>
+
+        <DataTable
+          :columns="comparisonColumns"
+          :rows="comparisonRows"
+          row-key="id"
+          caption="Statistical comparison of the two selected teams"
+          empty-message="No comparison data is available."
+        />
+      </template>
     </template>
   </div>
 </template>

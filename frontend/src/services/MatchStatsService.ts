@@ -4,6 +4,7 @@ import type { MatchStatsInterface } from '@/interfaces/MatchStatsInterface.js';
 import { AuthService } from '@/services/AuthService.js';
 import type { ServiceResult } from '@/services/ServiceResult.js';
 import { TeamService } from '@/services/TeamService.js';
+import { useAuthStore } from '@/stores/authstore.js';
 import { useMatchStatsStore } from '@/stores/matchstatsstore.js';
 import { generateId } from '@/utils/generateId.js';
 
@@ -16,7 +17,9 @@ export class MatchStatsService {
     return useMatchStatsStore().matchStats.find((matchStats) => matchStats.id === id);
   }
 
-  static createMatchStats(payload: CreateMatchStatsDTO): ServiceResult<MatchStatsInterface> {
+  static async createMatchStats(
+    payload: CreateMatchStatsDTO,
+  ): Promise<ServiceResult<MatchStatsInterface>> {
     if (!AuthService.isAdmin()) {
       return {
         success: false,
@@ -24,7 +27,12 @@ export class MatchStatsService {
       };
     }
 
-    const validatedPayload = MatchStatsService.validateAndNormalizePayload(payload);
+    const token = useAuthStore().accessToken;
+    const validatedPayload = await MatchStatsService.validateAndNormalizePayload(payload);
+
+    if (token !== useAuthStore().accessToken || !AuthService.isAdmin()) {
+      return { success: false, errors: ['The session has changed. Please sign in again.'] };
+    }
 
     if (validatedPayload.errors.length > 0 || validatedPayload.payload === undefined) {
       return { success: false, errors: validatedPayload.errors };
@@ -43,10 +51,10 @@ export class MatchStatsService {
     return { success: true, data: matchStats };
   }
 
-  static updateMatchStats(
+  static async updateMatchStats(
     id: string,
     payload: UpdateMatchStatsDTO,
-  ): ServiceResult<MatchStatsInterface> {
+  ): Promise<ServiceResult<MatchStatsInterface>> {
     if (!AuthService.isAdmin()) {
       return {
         success: false,
@@ -69,7 +77,15 @@ export class MatchStatsService {
       stadium: payload.stadium ?? existingMatchStats.stadium,
       attendance: payload.attendance ?? existingMatchStats.attendance,
     };
-    const validatedPayload = MatchStatsService.validateAndNormalizePayload(candidatePayload, id);
+    const token = useAuthStore().accessToken;
+    const validatedPayload = await MatchStatsService.validateAndNormalizePayload(
+      candidatePayload,
+      id,
+    );
+
+    if (token !== useAuthStore().accessToken || !AuthService.isAdmin()) {
+      return { success: false, errors: ['The session has changed. Please sign in again.'] };
+    }
 
     if (validatedPayload.errors.length > 0 || validatedPayload.payload === undefined) {
       return { success: false, errors: validatedPayload.errors };
@@ -105,18 +121,24 @@ export class MatchStatsService {
     return { success: true, data: existingMatchStats };
   }
 
-  private static validateAndNormalizePayload(
+  private static async validateAndNormalizePayload(
     payload: CreateMatchStatsDTO,
     excludedMatchStatsId?: string,
-  ): {
+  ): Promise<{
     payload?: CreateMatchStatsDTO;
     errors: string[];
-  } {
+  }> {
     const errors: string[] = [];
     const date = payload.date.trim();
     const stadium = payload.stadium.trim();
-    const homeTeam = TeamService.getTeamById(payload.homeTeamId);
-    const awayTeam = TeamService.getTeamById(payload.awayTeamId);
+    const [homeResult, awayResult] = await Promise.all([
+      TeamService.getTeamById(payload.homeTeamId),
+      TeamService.getTeamById(payload.awayTeamId),
+    ]);
+    if (!homeResult.success) return { errors: homeResult.errors };
+    if (!awayResult.success) return { errors: awayResult.errors };
+    const homeTeam = homeResult.data;
+    const awayTeam = awayResult.data;
 
     if (!MatchStatsService.isValidIsoDate(date)) {
       errors.push('Enter a valid match date.');

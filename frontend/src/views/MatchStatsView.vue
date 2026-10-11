@@ -1,15 +1,16 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 
+import ApiLoadState from '@/components/ApiLoadState.vue';
+import { useTeamPlayerData } from '@/composables/useTeamPlayerData.js';
 import ChartCard from '@/components/ChartCard.vue';
 import DataTable from '@/components/DataTable.vue';
 import FilterSelect from '@/components/FilterSelect.vue';
 import PageHeader from '@/components/PageHeader.vue';
-import { MatchStatsService } from '@/services/MatchStatsService.js';
-import { TeamService } from '@/services/TeamService.js';
 
-const matchStats = computed(() => MatchStatsService.getMatchStats());
-const teams = computed(() => TeamService.getTeams());
+const { teams, matchStats, isLoading, hasLoaded, loadErrors, isReady, loadData } =
+  useTeamPlayerData(true);
+
 const teamsById = computed(() => new Map(teams.value.map((team) => [team.id, team])));
 
 function getTeamName(teamId: string): string {
@@ -184,44 +185,52 @@ function clearFilters(): void {
         </span>
       </template>
     </PageHeader>
-
-    <section class="filters-bar" aria-label="Match filters">
-      <FilterSelect v-model="teamFilter" label="Team" :options="teamOptions" />
-      <FilterSelect v-model="stadiumFilter" label="Stadium" :options="stadiumOptions" />
-      <label class="date-field">
-        <span>From</span>
-        <input v-model="startDateFilter" type="date" :max="endDateFilter || undefined" />
-      </label>
-      <label class="date-field">
-        <span>To</span>
-        <input v-model="endDateFilter" type="date" :min="startDateFilter || undefined" />
-      </label>
-      <button type="button" class="clear-button" @click="clearFilters">Clear filters</button>
-    </section>
-
-    <section class="charts-grid">
-      <ChartCard
-        title="Goals by team"
-        description="Goals scored by each team in the currently filtered matches."
-        type="bar"
-        :data="goalsByTeamChart"
-        :options="{ plugins: { legend: { display: false } } }"
-      />
-      <ChartCard
-        title="Result distribution"
-        description="Home wins, draws, and away wins in the currently filtered matches."
-        type="doughnut"
-        :data="resultDistributionChart"
-      />
-    </section>
-
-    <DataTable
-      :columns="matchColumns"
-      :rows="matchRows"
-      row-key="id"
-      caption="Filtered match results, stadiums, and attendance"
-      empty-message="No matches match the selected filters."
+    <ApiLoadState
+      :is-loading="isLoading"
+      :errors="loadErrors"
+      :has-loaded="hasLoaded"
+      :is-empty="teams.length === 0"
+      @retry="loadData"
     />
+    <template v-if="isReady">
+      <section class="filters-bar" aria-label="Match filters">
+        <FilterSelect v-model="teamFilter" label="Team" :options="teamOptions" />
+        <FilterSelect v-model="stadiumFilter" label="Stadium" :options="stadiumOptions" />
+        <label class="date-field">
+          <span>From</span>
+          <input v-model="startDateFilter" type="date" :max="endDateFilter || undefined" />
+        </label>
+        <label class="date-field">
+          <span>To</span>
+          <input v-model="endDateFilter" type="date" :min="startDateFilter || undefined" />
+        </label>
+        <button type="button" class="clear-button" @click="clearFilters">Clear filters</button>
+      </section>
+
+      <section class="charts-grid">
+        <ChartCard
+          title="Goals by team"
+          description="Goals scored by each team in the currently filtered matches."
+          type="bar"
+          :data="goalsByTeamChart"
+          :options="{ plugins: { legend: { display: false } } }"
+        />
+        <ChartCard
+          title="Result distribution"
+          description="Home wins, draws, and away wins in the currently filtered matches."
+          type="doughnut"
+          :data="resultDistributionChart"
+        />
+      </section>
+
+      <DataTable
+        :columns="matchColumns"
+        :rows="matchRows"
+        row-key="id"
+        caption="Filtered match results, stadiums, and attendance"
+        empty-message="No matches match the selected filters."
+      />
+    </template>
   </div>
 </template>
 

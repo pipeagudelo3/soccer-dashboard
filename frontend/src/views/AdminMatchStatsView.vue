@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 
+import ApiLoadState from '@/components/ApiLoadState.vue';
+import { useTeamPlayerData } from '@/composables/useTeamPlayerData.js';
 import DataTable from '@/components/DataTable.vue';
 import MatchStatsFormPanel from '@/components/MatchStatsFormPanel.vue';
 import OperationFeedback from '@/components/OperationFeedback.vue';
@@ -10,11 +12,11 @@ import type { UpdateMatchStatsDTO } from '@/dtos/UpdateMatchStatsDTO.js';
 import type { MatchStatsInterface } from '@/interfaces/MatchStatsInterface.js';
 import { MatchStatsService } from '@/services/MatchStatsService.js';
 import type { ServiceResult } from '@/services/ServiceResult.js';
-import { TeamService } from '@/services/TeamService.js';
 import { confirmDeletion, showError, showSuccess } from '@/utils/notifications.js';
 
+const { teams, isLoading, hasLoaded, loadErrors, isReady, loadData } = useTeamPlayerData();
+
 const matchStats = computed(() => MatchStatsService.getMatchStats());
-const teams = computed(() => TeamService.getTeams());
 const teamNames = computed(() => new Map(teams.value.map((team) => [team.id, team.name])));
 
 function getTeamName(teamId: string): string {
@@ -22,6 +24,7 @@ function getTeamName(teamId: string): string {
 }
 
 const isFormOpen = ref(false);
+const isSaving = ref(false);
 const editingMatchStats = ref<MatchStatsInterface | null>(null);
 const feedbackErrors = ref<string[]>([]);
 const feedbackMessage = ref<string | null>(null);
@@ -67,18 +70,21 @@ function clearFeedback(): void {
 }
 
 function openCreateForm(): void {
+  if (isSaving.value) return;
   editingMatchStats.value = null;
   clearFeedback();
   isFormOpen.value = true;
 }
 
 function openEditForm(matchStatsId: string): void {
+  if (isSaving.value) return;
   editingMatchStats.value = MatchStatsService.getMatchStatsById(matchStatsId) ?? null;
   clearFeedback();
   isFormOpen.value = editingMatchStats.value !== null;
 }
 
 function closeForm(): void {
+  if (isSaving.value) return;
   isFormOpen.value = false;
   editingMatchStats.value = null;
   feedbackErrors.value = [];
@@ -98,22 +104,30 @@ function handleResult<T>(result: ServiceResult<T>, successMessage: string): bool
   return true;
 }
 
-function handleCreate(payload: CreateMatchStatsDTO): void {
-  handleResult(
-    MatchStatsService.createMatchStats(payload),
-    'Match statistics created successfully.',
-  );
+async function handleCreate(payload: CreateMatchStatsDTO): Promise<void> {
+  if (isSaving.value || !isReady.value) return;
+  isSaving.value = true;
+  try {
+    handleResult(
+      await MatchStatsService.createMatchStats(payload),
+      'Match statistics created successfully.',
+    );
+  } finally {
+    isSaving.value = false;
+  }
 }
 
-function handleUpdate(payload: UpdateMatchStatsDTO): void {
-  if (editingMatchStats.value === null) {
-    return;
+async function handleUpdate(payload: UpdateMatchStatsDTO): Promise<void> {
+  if (isSaving.value || !isReady.value || editingMatchStats.value === null) return;
+  isSaving.value = true;
+  try {
+    handleResult(
+      await MatchStatsService.updateMatchStats(editingMatchStats.value.id, payload),
+      'Match statistics updated successfully.',
+    );
+  } finally {
+    isSaving.value = false;
   }
-
-  handleResult(
-    MatchStatsService.updateMatchStats(editingMatchStats.value.id, payload),
-    'Match statistics updated successfully.',
-  );
 }
 
 function handleInvalid(errors: string[]): void {
@@ -122,6 +136,7 @@ function handleInvalid(errors: string[]): void {
 }
 
 async function handleDelete(matchStatsId: string): Promise<void> {
+  if (isSaving.value || !isReady.value) return;
   const currentMatchStats = MatchStatsService.getMatchStatsById(matchStatsId);
 
   if (currentMatchStats === undefined) {
@@ -158,58 +173,80 @@ async function handleDelete(matchStatsId: string): Promise<void> {
   <div class="admin-match-stats-view">
     <PageHeader
       title="Match statistics management"
-      description="Create and manage the match records used by the dashboard analysis."
+      description="Manage local match records while database administration is being integrated."
     >
       <template #actions>
         <button
           type="button"
           class="button-primary"
-          :disabled="teams.length < 2"
+          :disabled="teams.length < 2 || isSaving || !isReady"
           @click="openCreateForm"
         >
           Add match statistics
         </button>
       </template>
     </PageHeader>
-
-    <p v-if="teams.length < 2" class="feedback-warning" role="status">
-      At least two teams are required before match statistics can be created.
-    </p>
-
-    <OperationFeedback :errors="feedbackErrors" :success-message="feedbackMessage" />
-
-    <MatchStatsFormPanel
-      v-if="isFormOpen"
-      :editing-match-stats="editingMatchStats"
-      :teams="teams"
-      @create="handleCreate"
-      @update="handleUpdate"
-      @invalid="handleInvalid"
-      @cancel="closeForm"
+    <ApiLoadState
+      :is-loading="isLoading"
+      :errors="loadErrors"
+      :has-loaded="hasLoaded"
+      :is-empty="teams.length === 0"
+      @retry="loadData"
     />
-
-    <DataTable
-      :columns="matchStatsColumns"
-      :rows="matchStatsRows"
-      row-key="id"
-      caption="Recorded match statistics available for administration"
-      empty-message="No match statistics are available."
-    >
-      <template #cell-actions="{ row }">
-        <div class="row-actions">
-          <button type="button" class="link-button" @click="openEditForm(String(row.id))">
-            Edit
-          </button>
-          <button type="button" class="link-button danger" @click="handleDelete(String(row.id))">
-            Delete
-          </button>
-        </div>
-      </template>
-    </DataTable>
-
-    <p class="persistence-note">
-      Changes are synchronized through Pinia and the centralized LocalStorage configuration.
+    <p role="status">
+      Changes on this page are saved only in this browser. They do not change the database matches
+      displayed in statistics. Database match administration will be enabled in the next
+      integration.
     </p>
+    <template v-if="isReady">
+      <p v-if="teams.length < 2" class="feedback-warning" role="status">
+        At least two teams are required before match statistics can be created.
+      </p>
+
+      <OperationFeedback :errors="feedbackErrors" :success-message="feedbackMessage" />
+
+      <MatchStatsFormPanel
+        v-if="isFormOpen"
+        :editing-match-stats="editingMatchStats"
+        :teams="teams"
+        :is-submitting="isSaving"
+        @create="handleCreate"
+        @update="handleUpdate"
+        @invalid="handleInvalid"
+        @cancel="closeForm"
+      />
+
+      <DataTable
+        :columns="matchStatsColumns"
+        :rows="matchStatsRows"
+        row-key="id"
+        caption="Recorded match statistics available for administration"
+        empty-message="No match statistics are available."
+      >
+        <template #cell-actions="{ row }">
+          <div class="row-actions">
+            <button
+              type="button"
+              class="link-button"
+              :disabled="isSaving"
+              @click="openEditForm(String(row.id))"
+            >
+              Edit
+            </button>
+            <button
+              type="button"
+              class="link-button danger"
+              :disabled="isSaving"
+              @click="handleDelete(String(row.id))"
+            >
+              Delete
+            </button>
+          </div>
+        </template>
+      </DataTable>
+
+      <p class="persistence-note">Match edits on this page are stored in this browser.</p>
+    </template>
   </div>
 </template>
 
