@@ -2,11 +2,12 @@
 import { computed, ref } from 'vue';
 
 import ApiLoadState from '@/components/ApiLoadState.vue';
-import { useTeamPlayerData } from '@/composables/useTeamPlayerData.js';
 import ChartCard from '@/components/ChartCard.vue';
 import DataTable from '@/components/DataTable.vue';
 import FilterSelect from '@/components/FilterSelect.vue';
 import PageHeader from '@/components/PageHeader.vue';
+import { useTeamPlayerData } from '@/composables/useTeamPlayerData.js';
+import { calculateTeamMatchRows, filterMatches } from '@/utils/matchAnalytics.js';
 
 const { teams, players, matchStats, isLoading, hasLoaded, loadErrors, isReady, loadData } =
   useTeamPlayerData(true);
@@ -52,15 +53,10 @@ const filteredPlayers = computed(() =>
 );
 
 const filteredMatchStats = computed(() =>
-  matchStats.value.filter((match) => {
-    const matchesTeam =
-      teamFilter.value === 'all' ||
-      match.homeTeamId === teamFilter.value ||
-      match.awayTeamId === teamFilter.value;
-    const matchesStartDate = startDateFilter.value === '' || match.date >= startDateFilter.value;
-    const matchesEndDate = endDateFilter.value === '' || match.date <= endDateFilter.value;
-
-    return matchesTeam && matchesStartDate && matchesEndDate;
+  filterMatches(matchStats.value, {
+    teamId: teamFilter.value,
+    startDate: startDateFilter.value,
+    endDate: endDateFilter.value,
   }),
 );
 
@@ -149,82 +145,12 @@ const playerContributionsChart = computed(() => {
   };
 });
 
-const teamMatchRows = computed(() => {
-  const teamTotals = new Map<
-    string,
-    {
-      id: string;
-      team: string;
-      played: number;
-      wins: number;
-      draws: number;
-      losses: number;
-      goalsFor: number;
-      goalsAgainst: number;
-      attendance: number;
-    }
-  >();
-
-  function getTeamTotals(teamId: string, teamName: string) {
-    const existingTotals = teamTotals.get(teamId);
-
-    if (existingTotals !== undefined) {
-      return existingTotals;
-    }
-
-    const newTotals = {
-      id: teamId,
-      team: teamName,
-      played: 0,
-      wins: 0,
-      draws: 0,
-      losses: 0,
-      goalsFor: 0,
-      goalsAgainst: 0,
-      attendance: 0,
-    };
-
-    teamTotals.set(teamId, newTotals);
-    return newTotals;
-  }
-
-  for (const match of filteredMatchStats.value) {
-    const homeTotals = getTeamTotals(match.homeTeamId, getTeamName(match.homeTeamId));
-    const awayTotals = getTeamTotals(match.awayTeamId, getTeamName(match.awayTeamId));
-
-    homeTotals.played += 1;
-    homeTotals.goalsFor += match.goalsHomeTeam;
-    homeTotals.goalsAgainst += match.goalsAwayTeam;
-    homeTotals.attendance += match.attendance;
-
-    awayTotals.played += 1;
-    awayTotals.goalsFor += match.goalsAwayTeam;
-    awayTotals.goalsAgainst += match.goalsHomeTeam;
-    awayTotals.attendance += match.attendance;
-
-    if (match.goalsHomeTeam > match.goalsAwayTeam) {
-      homeTotals.wins += 1;
-      awayTotals.losses += 1;
-    } else if (match.goalsHomeTeam < match.goalsAwayTeam) {
-      awayTotals.wins += 1;
-      homeTotals.losses += 1;
-    } else {
-      homeTotals.draws += 1;
-      awayTotals.draws += 1;
-    }
-  }
-
-  return [...teamTotals.values()]
-    .sort((firstTeam, secondTeam) => {
-      const firstPoints = firstTeam.wins * 3 + firstTeam.draws;
-      const secondPoints = secondTeam.wins * 3 + secondTeam.draws;
-      return secondPoints - firstPoints || secondTeam.goalsFor - firstTeam.goalsFor;
-    })
-    .map((team) => ({
-      ...team,
-      attendance: numberFormatter.format(team.attendance),
-    }));
-});
+const teamMatchRows = computed(() =>
+  calculateTeamMatchRows(teams.value, filteredMatchStats.value).map((team) => ({
+    ...team,
+    attendance: numberFormatter.format(team.attendance),
+  })),
+);
 
 const teamMatchColumns = [
   { key: 'team', label: 'Team' },
@@ -300,7 +226,7 @@ function clearFilters(): void {
       :is-loading="isLoading"
       :errors="loadErrors"
       :has-loaded="hasLoaded"
-      :is-empty="teams.length === 0"
+      :is-empty="players.length === 0 && matchStats.length === 0"
       @retry="loadData"
     />
     <template v-if="isReady">
@@ -318,8 +244,8 @@ function clearFilters(): void {
       </section>
 
       <p class="filter-note">
-        Position filters player indicators. Date filters match and team indicators because Player
-        stores season totals without a per-match date relationship.
+        Position filters player indicators. Date filters match and team indicators because player
+        records contain season totals without a per-match date relationship.
       </p>
 
       <section class="summary-grid" aria-label="Statistics summary">
