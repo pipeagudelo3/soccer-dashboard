@@ -216,7 +216,7 @@ A successful write is not reported as failed merely because a later profile chec
 ### Validation and manual evaluation
 
 `npm run verify` includes transport, authentication/navigation, Users administration and
-Teams/Players integration tests. The 33 Users service, page-state and form-rendering tests cover DTO serialization, safe responses, permissions,
+Teams/Players integration tests. The 36 Users service, page-state, form-rendering and lifecycle tests cover DTO serialization, safe responses, permissions,
 validation/conflicts, loading/retry/empty states, stale records, races, self-update/self-delete,
 legacy snapshot exclusion and preservation of inline form feedback. Test Vite servers disable
 HMR/WebSocket because no browser hot reload is needed; parallel files no longer compete for port 24678. No dependency was added for this requirement.
@@ -337,7 +337,7 @@ The legacy store/seeder files are retained for compatibility and are unused by a
 ### Verification
 
 With Node 24.19.0 and npm 11.9.0, `npm ci` and `npm run verify` pass: ESLint, Prettier, application and
-test types, 146 tests and the production build. The 118 previous tests remain, with persistence
+test types, 149 tests and the production build. The 121 previous tests remain, with persistence
 expectations updated for MatchStats migration and a race fixture adjusted to use consistent IDs.
 Twenty-eight added tests cover transport/DTOs, errors, form/stale-record behavior, partial loads,
 retry, normalized relationships, filters, independent calculation expectations, zero/empty charts
@@ -378,13 +378,25 @@ origin to backend CORS configuration and restart the backend. Restart Vite after
 7. Reload the browser, login again, and confirm database persistence. The memory-only token is
    intentionally lost on a full reload; losing login is not losing SQLite records.
 
-### Dependency audit at implementation time
+### Formatting and dependency audit
 
-The production audit (`npm audit --omit=dev`) reports zero vulnerabilities. The full audit continues
-to report four high findings in the development chain
-`@vue/eslint-config-typescript → fast-glob → micromatch → braces`. No dependencies changed in #54.
-The proposed incompatible `npm audit fix --force` downgrade was not applied. Full audit is recorded
-with these findings rather than reported as clean; the toolchain update remains separate work.
+Frontend text files use LF, matching the default of the shared `.prettierrc.json`.
+The repository `.gitattributes` enforces `frontend/** text=auto eol=lf`, so Windows
+checkouts remain compatible with `npm run format:check` even with `core.autocrlf=true`.
+Keep the official Prettier configuration; do not bypass the check with `--end-of-line auto`.
+
+The previous high-severity development chain was
+`@vue/eslint-config-typescript → fast-glob → micromatch → braces`.
+ESLint now uses the official `typescript-eslint` configuration directly with
+`eslint-plugin-vue` and the existing Vue/Prettier configuration. `typescript-eslint`
+was already installed transitively; it is now an explicit development dependency at
+the same version. The Vue SFC parser and the TypeScript-only script requirement remain.
+The effective rules for TypeScript, Vue and JavaScript were compared before and after
+and match. No runtime dependency or HTTP behavior changes.
+
+On 2026-10-09, both `npm audit` and `npm audit --omit=dev` reported zero vulnerabilities.
+The vulnerable glob chain was removed instead of downgrading ESLint, hiding advisories
+or using `npm audit fix --force`. Run both audits again when dependencies change.
 
 The global font-weight reset remains unchanged in this phase to avoid an application-wide visual
 change; it should be reviewed as part of the next visual consistency phase.
