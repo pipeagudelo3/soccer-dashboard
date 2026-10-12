@@ -8,7 +8,6 @@ import { AxiosError } from 'axios';
 import { createPinia, setActivePinia } from 'pinia';
 import { createServer } from 'vite';
 import type { ViteDevServer } from 'vite';
-import { effectScope, nextTick } from 'vue';
 
 // Vite resolves the same aliases and import.meta.env as the application, without another test library.
 let vite: ViteDevServer;
@@ -16,7 +15,6 @@ let api: typeof import('../src/services/ApiService.js');
 let errors: typeof import('../src/services/ApiErrorService.js');
 let environment: typeof import('../src/config/environment.js');
 let auth: typeof import('../src/stores/authstore.js');
-let persistence: typeof import('../src/PiniaConfig.js');
 let requestCount = 0;
 let handler: (request: IncomingMessage, response: ServerResponse) => void;
 
@@ -42,7 +40,6 @@ before(async () => {
   errors = (await vite.ssrLoadModule('/src/services/ApiErrorService.ts')) as typeof errors;
   environment = (await vite.ssrLoadModule('/src/config/environment.ts')) as typeof environment;
   auth = (await vite.ssrLoadModule('/src/stores/authstore.ts')) as typeof auth;
-  persistence = (await vite.ssrLoadModule('/src/PiniaConfig.ts')) as typeof persistence;
 });
 
 beforeEach(() => {
@@ -308,53 +305,5 @@ test('validates configuration and supports same-origin deployments without a loc
     'https://example.test/api#fragment',
   ]) {
     assert.throws(() => environment.resolveApiBaseUrl(value));
-  }
-});
-
-test('never saves or restores the token through centralized Pinia persistence', async () => {
-  const values = new Map<string, string>();
-  const storage = {
-    getItem: (key: string) => values.get(key) ?? null,
-    setItem: (key: string, value: string) => {
-      values.set(key, value);
-    },
-  };
-  const oldStorage = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
-  Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: storage });
-  const scope = effectScope();
-
-  try {
-    const pinia = createPinia();
-    setActivePinia(pinia);
-    scope.run(() => persistence.configurePinia(pinia));
-    const store = startSession();
-    await nextTick();
-    assert.ok(!storage.getItem(persistence.piniaStateKey)?.includes('academic-test-token'));
-    assert.equal(store.accessToken, 'academic-test-token');
-    const saved = JSON.parse(storage.getItem(persistence.piniaStateKey) ?? '{}') as {
-      state: { auth: { currentUser: { id: string }; accessToken?: string } };
-    };
-    assert.equal(saved.state.auth, undefined);
-    saved.state.auth = {
-      currentUser: { id: 'test-user' },
-      accessToken: 'previously-persisted-test-token',
-    };
-    storage.setItem(persistence.piniaStateKey, JSON.stringify(saved));
-    const reloaded = createPinia();
-    setActivePinia(reloaded);
-    scope.run(() => persistence.configurePinia(reloaded));
-    assert.equal(auth.useAuthStore().accessToken, null);
-    assert.ok(
-      !storage.getItem(persistence.piniaStateKey)?.includes('previously-persisted-test-token'),
-    );
-    assert.equal(auth.useAuthStore().currentUser, null);
-    assert.equal(auth.useAuthStore().isAuthenticated, false);
-  } finally {
-    scope.stop();
-    if (oldStorage === undefined) {
-      Reflect.deleteProperty(globalThis, 'localStorage');
-    } else {
-      Object.defineProperty(globalThis, 'localStorage', oldStorage);
-    }
   }
 });

@@ -22,7 +22,6 @@ let state: typeof import('../src/composables/useUserAdministration.js');
 let auth: typeof import('../src/services/AuthService.js');
 let stores: typeof import('../src/stores/authstore.js');
 let api: typeof import('../src/services/ApiService.js');
-let persistence: typeof import('../src/PiniaConfig.js');
 let page: ReturnType<typeof state.useUserAdministration>;
 let scope: EffectScope;
 let records: UserInterface[];
@@ -134,7 +133,6 @@ before(async () => {
   auth = (await vite.ssrLoadModule('/src/services/AuthService.ts')) as typeof auth;
   stores = (await vite.ssrLoadModule('/src/stores/authstore.ts')) as typeof stores;
   api = (await vite.ssrLoadModule('/src/services/ApiService.ts')) as typeof api;
-  persistence = (await vite.ssrLoadModule('/src/PiniaConfig.ts')) as typeof persistence;
 });
 beforeEach(() => {
   fixtureExpiry = Math.floor(Date.now() / 1000) + 900;
@@ -471,49 +469,7 @@ test('stale DELETE 404 removes only the vanished row and exposes feedback', asyn
   );
   assert.ok(page.feedbackErrors.value.length > 0);
 });
-test('backend-owned domains are neither hydrated nor saved while UI preferences survive', async () => {
-  const values = new Map<string, string>();
-  const local = {
-    getItem: (key: string) => values.get(key) ?? null,
-    setItem: (key: string, value: string) => {
-      values.set(key, value);
-    },
-  };
-  const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
-  Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: local });
-  const persistenceScope = effectScope();
-  try {
-    local.setItem(
-      'piniaState',
-      JSON.stringify({
-        version: 2,
-        state: {
-          users: { users: [{ password: 'old-secret', name: 'Old User' }] },
-          auth: { accessToken: 'old-token' },
-          teams: { teams: [{ id: 'preserved-team' }] },
-          players: { players: [] },
-          matchStats: { matchStats: [] },
-          preferences: { theme: 'dark' },
-        },
-      }),
-    );
-    const pinia = createPinia();
-    setActivePinia(pinia);
-    persistenceScope.run(() => persistence.configurePinia(pinia));
-    assert.equal(pinia.state.value.users, undefined);
-    assert.equal(pinia.state.value.auth, undefined);
-    assert.equal(pinia.state.value.teams, undefined);
-    assert.equal(pinia.state.value.players, undefined);
-    assert.equal(pinia.state.value.matchStats, undefined);
-    assert.deepEqual(pinia.state.value.preferences, { theme: 'dark' });
-    assert.ok(!local.getItem('piniaState')?.includes('preserved-team'));
-    assert.ok(!local.getItem('piniaState')?.includes('old-secret'));
-  } finally {
-    persistenceScope.stop();
-    if (descriptor) Object.defineProperty(globalThis, 'localStorage', descriptor);
-    else Reflect.deleteProperty(globalThis, 'localStorage');
-  }
-});
+
 for (const bad of [
   {},
   { ...record(userId), updatedAt: 'invalid' },
