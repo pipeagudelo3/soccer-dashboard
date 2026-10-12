@@ -384,7 +384,7 @@ checkouts remain compatible with `npm run format:check` even with `core.autocrlf
 Keep the official Prettier configuration; do not bypass the check with `--end-of-line auto`.
 
 The previous high-severity development chain was
-`@vue/eslint-config-typescript ÔåÆ fast-glob ÔåÆ micromatch ÔåÆ braces`.
+@vue/eslint-config-typescript → fast-glob → micromatch → braces
 ESLint now uses the official `typescript-eslint` configuration directly with
 `eslint-plugin-vue` and the existing Vue/Prettier configuration. `typescript-eslint`
 was already installed transitively; it is now an explicit development dependency at
