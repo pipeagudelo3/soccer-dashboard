@@ -21,6 +21,10 @@ const props = withDefaults(
   },
 );
 
+const emit = defineEmits<{
+  navigate: [];
+}>();
+
 const router = useRouter();
 
 const navigationItems: NavigationItem[] = [
@@ -114,6 +118,7 @@ const visibleNavigationItems = computed<NavigationItem[]>(() =>
           :to="{ name: item.routeName }"
           class="navigation-link"
           exact-active-class="navigation-link--active"
+          @click="emit('navigate')"
         >
           {{ item.label }}
         </RouterLink>
@@ -126,6 +131,7 @@ const visibleNavigationItems = computed<NavigationItem[]>(() =>
 .navigation-list {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 0.5rem;
   padding: 0;
   margin: 0;
@@ -138,6 +144,7 @@ const visibleNavigationItems = computed<NavigationItem[]>(() =>
   min-height: 2.5rem;
   padding: 0.5rem 0.875rem;
   color: #dbeafe;
+  white-space: nowrap;
   border-radius: 0.5rem;
   text-decoration: none;
   transition:
@@ -155,15 +162,16 @@ const visibleNavigationItems = computed<NavigationItem[]>(() =>
   background-color: #2563eb;
 }
 
-@media (max-width: 700px) {
+@media (max-width: 1100px) {
   .navigation-list {
-    justify-content: center;
-    flex-wrap: wrap;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.25rem;
   }
 
   .navigation-link {
-    min-height: 2.25rem;
-    padding: 0.4rem 0.7rem;
+    display: flex;
+    min-height: var(--touch-target);
   }
 }
 </style>
