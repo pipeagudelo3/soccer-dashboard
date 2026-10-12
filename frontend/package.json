@@ -15,7 +15,8 @@
     "format:check": "prettier --check --experimental-cli .",
     "test": "node --experimental-strip-types --test test/*.test.ts",
     "type-check:test": "vue-tsc --noEmit -p tsconfig.test.json",
-    "verify": "run-s lint format:check type-check type-check:test test build-only"
+    "verify": "run-s lint format:check type-check type-check:test test build-only",
+    "test:full-stack": "node ../scripts/full-stack-regression.mjs"
   },
   "dependencies": {
     "axios": "^1.20.0",
