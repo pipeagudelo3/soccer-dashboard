@@ -1,0 +1,16 @@
+flowchart TD
+  Request["Petición HTTP"] --> Bootstrap["createApplication"]
+  Bootstrap --> Cross["Helmet, CORS, límite JSON y request logger"]
+  Cross --> Validation["ValidationPipe global"]
+  Validation --> Guards["JWT guard y role guard"]
+  Guards --> Controllers["Controllers"]
+  Controllers --> Services["Services de aplicación y dominio"]
+  Services --> Write["DatabaseWriteService"]
+  Services --> Repositories["Repositorios TypeORM"]
+  Write --> Repositories
+  Repositories --> Entities["User, Team, Player y MatchStats"]
+  Entities --> SQLite[("SQLite")]
+  Controllers --> DTOs["DTOs de entrada y respuesta"]
+  Exceptions["ApiExceptionFilter"] --> Response["Envelope HTTP seguro"]
+  Controllers --> Response
+  Seed["seed CLI / SeedService"] --> Write

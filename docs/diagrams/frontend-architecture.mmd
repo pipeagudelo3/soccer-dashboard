@@ -1,0 +1,14 @@
+flowchart TD
+  Main["main.ts y App.vue"] --> Router["Router y authenticationGuard"]
+  Router --> Views["Vistas por ruta"]
+  Views --> Components["Componentes reutilizables y formularios"]
+  Views --> Composables["Composables de administración y recursos"]
+  Composables --> DomainServices["AuthService y servicios de dominio"]
+  Views --> DomainServices
+  DomainServices --> Api["ApiService"]
+  Api --> Error["ApiErrorService"]
+  Api --> Pinia["authstore"]
+  Api -->|"endpoints relativos"| Backend["API NestJS /api"]
+  Pinia -->|"token, perfil y expiración"| Memory["Memoria de ejecución"]
+  Main --> Legacy["LegacyStorageService"]
+  Legacy -->|"elimina la clave antigua"| LocalStorage["localStorage.piniaState"]
