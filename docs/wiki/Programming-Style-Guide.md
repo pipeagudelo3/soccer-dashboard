@@ -218,4 +218,3 @@ git status --short
 5. Revisar `git diff --check`, `git status --short` y el diff staged.
 
 Está prohibido silenciar ESLint, relajar TypeScript, excluir archivos de Prettier o reducir cobertura sin una decisión documentada y revisada.
-

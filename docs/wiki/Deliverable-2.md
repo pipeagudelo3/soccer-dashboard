@@ -283,4 +283,3 @@ La infraestructura final en GCP se documentará únicamente después de verifica
 - Los diagramas se versionan como Mermaid para poder revisar diferencias.
 - El Markdown del repositorio se revisa antes de copiarse a la Wiki.
 - No deben volver a presentarse `PiniaConfig.ts`, stores/seeders frontend ni LocalStorage como arquitectura vigente.
-

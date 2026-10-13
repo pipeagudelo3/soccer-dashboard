@@ -284,4 +284,3 @@ Una tarea solo puede pasar a `Done` cuando:
 - [ ] Documentación y diagramas coinciden con el código.
 - [ ] Un integrante distinto revisó y aprobó, salvo una excepción de equipo documentada.
 - [ ] El PR fue fusionado y el Project quedó actualizado.
-

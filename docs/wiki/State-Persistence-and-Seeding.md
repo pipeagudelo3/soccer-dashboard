@@ -168,4 +168,3 @@ Además:
 - comprobar que eliminar un equipo deja `player.teamId = null`;
 - comprobar que un equipo con partidos no puede eliminarse;
 - iniciar la API sin ejecutar el seed y confirmar que no inserta datos automáticamente.
-

@@ -23,4 +23,3 @@ Repositorio: <https://github.com/pipeagudelo3/soccer-dashboard>
 Las páginas de la primera entrega que presentan Pinia/LocalStorage como base de datos, stores de dominio, seeders frontend o `PiniaConfig.ts` son históricas y no describen la implementación actual.
 
 La fuente versionada en `docs/wiki` debe aprobarse mediante Pull Request antes de copiarse a la Wiki de GitHub.
-
