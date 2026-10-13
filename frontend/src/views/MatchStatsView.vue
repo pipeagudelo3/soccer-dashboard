@@ -1,15 +1,21 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 
+import ApiLoadState from '@/components/ApiLoadState.vue';
+import { useTeamPlayerData } from '@/composables/useTeamPlayerData.js';
 import ChartCard from '@/components/ChartCard.vue';
 import DataTable from '@/components/DataTable.vue';
 import FilterSelect from '@/components/FilterSelect.vue';
 import PageHeader from '@/components/PageHeader.vue';
-import { MatchStatsService } from '@/services/MatchStatsService.js';
-import { TeamService } from '@/services/TeamService.js';
+import {
+  calculateMatchGoals,
+  calculateResultDistribution,
+  filterMatches,
+} from '@/utils/matchAnalytics.js';
 
-const matchStats = computed(() => MatchStatsService.getMatchStats());
-const teams = computed(() => TeamService.getTeams());
+const { teams, matchStats, isLoading, hasLoaded, loadErrors, isReady, loadData } =
+  useTeamPlayerData(true, false);
+
 const teamsById = computed(() => new Map(teams.value.map((team) => [team.id, team])));
 
 function getTeamName(teamId: string): string {
@@ -41,16 +47,11 @@ const stadiumOptions = computed(() => {
 });
 
 const filteredMatchStats = computed(() =>
-  matchStats.value.filter((match) => {
-    const matchesTeam =
-      teamFilter.value === 'all' ||
-      match.homeTeamId === teamFilter.value ||
-      match.awayTeamId === teamFilter.value;
-    const matchesStadium = stadiumFilter.value === 'all' || match.stadium === stadiumFilter.value;
-    const matchesStartDate = startDateFilter.value === '' || match.date >= startDateFilter.value;
-    const matchesEndDate = endDateFilter.value === '' || match.date <= endDateFilter.value;
-
-    return matchesTeam && matchesStadium && matchesStartDate && matchesEndDate;
+  filterMatches(matchStats.value, {
+    teamId: teamFilter.value,
+    stadium: stadiumFilter.value,
+    startDate: startDateFilter.value,
+    endDate: endDateFilter.value,
   }),
 );
 
@@ -87,82 +88,22 @@ const matchRows = computed(() =>
 );
 
 const goalsByTeamChart = computed(() => {
-  const goalsByTeamId = new Map<
-    string,
+  const totals = calculateMatchGoals(teams.value, filteredMatchStats.value);
+  return {
+    labels: totals.labels,
+    datasets: [{ label: 'Goals', data: totals.goals, backgroundColor: '#2563eb', borderRadius: 6 }],
+  };
+});
+const resultDistributionChart = computed(() => ({
+  labels: ['Home wins', 'Draws', 'Away wins'],
+  datasets: [
     {
-      name: string;
-      country: string;
-      goals: number;
-    }
-  >();
-
-  function addGoals(teamId: string, goals: number): void {
-    const team = teamsById.value.get(teamId);
-    const currentTeam = goalsByTeamId.get(teamId);
-
-    goalsByTeamId.set(teamId, {
-      name: team?.name ?? 'Unknown team',
-      country: team?.country ?? teamId,
-      goals: (currentTeam?.goals ?? 0) + goals,
-    });
-  }
-
-  for (const match of filteredMatchStats.value) {
-    addGoals(match.homeTeamId, match.goalsHomeTeam);
-    addGoals(match.awayTeamId, match.goalsAwayTeam);
-  }
-
-  const teamNameCounts = new Map<string, number>();
-
-  for (const team of goalsByTeamId.values()) {
-    teamNameCounts.set(team.name, (teamNameCounts.get(team.name) ?? 0) + 1);
-  }
-
-  const sortedTotals = [...goalsByTeamId.values()].sort(
-    (firstTeam, secondTeam) => secondTeam.goals - firstTeam.goals,
-  );
-
-  return {
-    labels: sortedTotals.map((team) =>
-      (teamNameCounts.get(team.name) ?? 0) > 1 ? `${team.name} (${team.country})` : team.name,
-    ),
-    datasets: [
-      {
-        label: 'Goals',
-        data: sortedTotals.map((team) => team.goals),
-        backgroundColor: '#2563eb',
-        borderRadius: 6,
-      },
-    ],
-  };
-});
-
-const resultDistributionChart = computed(() => {
-  let homeWins = 0;
-  let draws = 0;
-  let awayWins = 0;
-
-  for (const match of filteredMatchStats.value) {
-    if (match.goalsHomeTeam > match.goalsAwayTeam) {
-      homeWins += 1;
-    } else if (match.goalsHomeTeam < match.goalsAwayTeam) {
-      awayWins += 1;
-    } else {
-      draws += 1;
-    }
-  }
-
-  return {
-    labels: ['Home wins', 'Draws', 'Away wins'],
-    datasets: [
-      {
-        label: 'Matches',
-        data: [homeWins, draws, awayWins],
-        backgroundColor: ['#2563eb', '#f59e0b', '#0f766e'],
-      },
-    ],
-  };
-});
+      label: 'Matches',
+      data: calculateResultDistribution(filteredMatchStats.value),
+      backgroundColor: ['#2563eb', '#f59e0b', '#0f766e'],
+    },
+  ],
+}));
 
 function clearFilters(): void {
   teamFilter.value = 'all';
@@ -179,49 +120,57 @@ function clearFilters(): void {
       description="Analyze match results, goals, stadiums, and attendance."
     >
       <template #actions>
-        <span class="result-count">
+        <span v-if="isReady" class="result-count">
           {{ filteredMatchStats.length }} of {{ matchStats.length }} matches
         </span>
       </template>
     </PageHeader>
-
-    <section class="filters-bar" aria-label="Match filters">
-      <FilterSelect v-model="teamFilter" label="Team" :options="teamOptions" />
-      <FilterSelect v-model="stadiumFilter" label="Stadium" :options="stadiumOptions" />
-      <label class="date-field">
-        <span>From</span>
-        <input v-model="startDateFilter" type="date" :max="endDateFilter || undefined" />
-      </label>
-      <label class="date-field">
-        <span>To</span>
-        <input v-model="endDateFilter" type="date" :min="startDateFilter || undefined" />
-      </label>
-      <button type="button" class="clear-button" @click="clearFilters">Clear filters</button>
-    </section>
-
-    <section class="charts-grid">
-      <ChartCard
-        title="Goals by team"
-        description="Goals scored by each team in the currently filtered matches."
-        type="bar"
-        :data="goalsByTeamChart"
-        :options="{ plugins: { legend: { display: false } } }"
-      />
-      <ChartCard
-        title="Result distribution"
-        description="Home wins, draws, and away wins in the currently filtered matches."
-        type="doughnut"
-        :data="resultDistributionChart"
-      />
-    </section>
-
-    <DataTable
-      :columns="matchColumns"
-      :rows="matchRows"
-      row-key="id"
-      caption="Filtered match results, stadiums, and attendance"
-      empty-message="No matches match the selected filters."
+    <ApiLoadState
+      :is-loading="isLoading"
+      :errors="loadErrors"
+      :has-loaded="hasLoaded"
+      :is-empty="matchStats.length === 0"
+      @retry="loadData"
     />
+    <template v-if="isReady">
+      <section class="filters-bar" aria-label="Match filters">
+        <FilterSelect v-model="teamFilter" label="Team" :options="teamOptions" />
+        <FilterSelect v-model="stadiumFilter" label="Stadium" :options="stadiumOptions" />
+        <label class="date-field">
+          <span>From</span>
+          <input v-model="startDateFilter" type="date" :max="endDateFilter || undefined" />
+        </label>
+        <label class="date-field">
+          <span>To</span>
+          <input v-model="endDateFilter" type="date" :min="startDateFilter || undefined" />
+        </label>
+        <button type="button" class="clear-button" @click="clearFilters">Clear filters</button>
+      </section>
+
+      <section class="charts-grid">
+        <ChartCard
+          title="Goals by team"
+          description="Goals scored by each team in the currently filtered matches."
+          type="bar"
+          :data="goalsByTeamChart"
+          :options="{ plugins: { legend: { display: false } } }"
+        />
+        <ChartCard
+          title="Result distribution"
+          description="Home wins, draws, and away wins in the currently filtered matches."
+          type="doughnut"
+          :data="resultDistributionChart"
+        />
+      </section>
+
+      <DataTable
+        :columns="matchColumns"
+        :rows="matchRows"
+        row-key="id"
+        caption="Filtered match results, stadiums, and attendance"
+        empty-message="No matches match the selected filters."
+      />
+    </template>
   </div>
 </template>
 

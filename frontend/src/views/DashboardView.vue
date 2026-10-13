@@ -1,19 +1,19 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 
+import ApiLoadState from '@/components/ApiLoadState.vue';
 import ChartCard from '@/components/ChartCard.vue';
 import DataTable from '@/components/DataTable.vue';
 import PageHeader from '@/components/PageHeader.vue';
-import { MatchStatsService } from '@/services/MatchStatsService.js';
-import { PlayerService } from '@/services/PlayerService.js';
-import { TeamService } from '@/services/TeamService.js';
+import { useTeamPlayerData } from '@/composables/useTeamPlayerData.js';
 import { useAuthStore } from '@/stores/authstore.js';
+import { calculateRosterGoals } from '@/utils/matchAnalytics.js';
+
+const { teams, players, matchStats, isLoading, hasLoaded, loadErrors, isReady, loadData } =
+  useTeamPlayerData(true);
 
 const authStore = useAuthStore();
 
-const teams = computed(() => TeamService.getTeams());
-const players = computed(() => PlayerService.getPlayers());
-const matchStats = computed(() => MatchStatsService.getMatchStats());
 const teamNames = computed(() => new Map(teams.value.map((team) => [team.id, team.name])));
 
 function getTeamName(teamId: string): string {
@@ -32,22 +32,13 @@ const summaryCards = computed(() => [
 ]);
 
 const goalsByTeamChart = computed(() => {
-  const totals = new Map<string, number>();
-
-  for (const player of players.value) {
-    if (player.teamId === null) {
-      continue;
-    }
-
-    totals.set(player.teamId, (totals.get(player.teamId) ?? 0) + player.goals);
-  }
-
+  const totals = calculateRosterGoals(teams.value, players.value);
   return {
-    labels: [...totals.keys()].map(getTeamName),
+    labels: totals.map((total) => total.team),
     datasets: [
       {
         label: 'Goals',
-        data: [...totals.values()],
+        data: totals.map((total) => total.goals),
         backgroundColor: '#2563eb',
         borderRadius: 6,
       },
@@ -103,40 +94,48 @@ const matchRows = computed(() =>
       title="Dashboard"
       :description="`Welcome back, ${authStore.currentUser?.name ?? 'user'}. Here is the current season overview.`"
     />
+    <ApiLoadState
+      :is-loading="isLoading"
+      :errors="loadErrors"
+      :has-loaded="hasLoaded"
+      :is-empty="teams.length === 0 && players.length === 0 && matchStats.length === 0"
+      @retry="loadData"
+    />
+    <template v-if="isReady">
+      <section class="summary-grid">
+        <article v-for="card in summaryCards" :key="card.label" class="summary-card">
+          <span class="summary-value">{{ card.value }}</span>
+          <span class="summary-label">{{ card.label }}</span>
+        </article>
+      </section>
 
-    <section class="summary-grid">
-      <article v-for="card in summaryCards" :key="card.label" class="summary-card">
-        <span class="summary-value">{{ card.value }}</span>
-        <span class="summary-label">{{ card.label }}</span>
-      </article>
-    </section>
+      <section class="charts-grid">
+        <ChartCard
+          title="Goals by team"
+          description="Total goals scored by each team's roster this season."
+          type="bar"
+          :data="goalsByTeamChart"
+          :options="{ plugins: { legend: { display: false } } }"
+        />
+        <ChartCard
+          title="Players by position"
+          description="Distribution of the squad across playing positions."
+          type="doughnut"
+          :data="playersByPositionChart"
+        />
+      </section>
 
-    <section class="charts-grid">
-      <ChartCard
-        title="Goals by team"
-        description="Total goals scored by each team's roster this season."
-        type="bar"
-        :data="goalsByTeamChart"
-        :options="{ plugins: { legend: { display: false } } }"
-      />
-      <ChartCard
-        title="Players by position"
-        description="Distribution of the squad across playing positions."
-        type="doughnut"
-        :data="playersByPositionChart"
-      />
-    </section>
-
-    <section class="matches-section">
-      <h2>Latest matches</h2>
-      <DataTable
-        :columns="matchColumns"
-        :rows="matchRows"
-        row-key="id"
-        caption="Latest recorded match results"
-        empty-message="No matches recorded yet."
-      />
-    </section>
+      <section class="matches-section">
+        <h2>Latest matches</h2>
+        <DataTable
+          :columns="matchColumns"
+          :rows="matchRows"
+          row-key="id"
+          caption="Latest recorded match results"
+          empty-message="No matches recorded yet."
+        />
+      </section>
+    </template>
   </div>
 </template>
 

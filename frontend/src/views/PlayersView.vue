@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 
+import ApiLoadState from '@/components/ApiLoadState.vue';
+import { useTeamPlayerData } from '@/composables/useTeamPlayerData.js';
+import { useResourceAdministration } from '@/composables/useResourceAdministration.js';
 import ChartCard from '@/components/ChartCard.vue';
 import DataTable from '@/components/DataTable.vue';
 import FilterSelect from '@/components/FilterSelect.vue';
@@ -10,26 +13,43 @@ import PlayerFormPanel from '@/components/PlayerFormPanel.vue';
 import type { CreatePlayerDTO } from '@/dtos/CreatePlayerDTO.js';
 import type { PlayerInterface } from '@/interfaces/PlayerInterface.js';
 import { PlayerService } from '@/services/PlayerService.js';
-import type { ServiceResult } from '@/services/ServiceResult.js';
-import { TeamService } from '@/services/TeamService.js';
 import { useAuthStore } from '@/stores/authstore.js';
 import { confirmDeletion, showError, showSuccess } from '@/utils/notifications.js';
 
 const authStore = useAuthStore();
 
-const players = ref<PlayerInterface[]>(PlayerService.getPlayers());
-const teams = computed(() => TeamService.getTeams());
+const { teams, players, isLoading, hasLoaded, loadErrors, isReady, loadData } = useTeamPlayerData();
+const {
+  editingRecord: editingPlayer,
+  isFormOpen,
+  isSaving,
+  isStale,
+  feedbackErrors,
+  feedbackMessage,
+  isBusy,
+  openCreateForm,
+  openEditForm,
+  closeForm,
+  save,
+  deleteRecord,
+} = useResourceAdministration<PlayerInterface, CreatePlayerDTO, CreatePlayerDTO>(
+  players,
+  isLoading,
+  loadData,
+  {
+    get: PlayerService.getPlayerById,
+    create: PlayerService.createPlayer,
+    update: PlayerService.updatePlayer,
+    remove: PlayerService.deletePlayer,
+  },
+  'Player',
+);
 const teamNames = computed(() => new Map(teams.value.map((team) => [team.id, team.name])));
 
 const teamFilter = ref('all');
 const positionFilter = ref('all');
 const statusFilter = ref('all');
 const nameSearch = ref('');
-
-const isFormOpen = ref(false);
-const editingPlayer = ref<PlayerInterface | null>(null);
-const feedbackErrors = ref<string[]>([]);
-const feedbackMessage = ref<string | null>(null);
 
 const teamOptions = computed(() => [
   { label: 'All teams', value: 'all' },
@@ -111,89 +131,16 @@ const topScorersChart = computed(() => {
   };
 });
 
-function refreshPlayers(): void {
-  players.value = PlayerService.getPlayers();
+function handleSubmit(payload: CreatePlayerDTO): Promise<void> {
+  return save(payload);
 }
-
-function openCreateForm(): void {
-  if (!authStore.isAdmin) {
-    return;
-  }
-
-  editingPlayer.value = null;
-  feedbackErrors.value = [];
-  feedbackMessage.value = null;
-  isFormOpen.value = true;
-}
-
-function openEditForm(playerId: string): void {
-  if (!authStore.isAdmin) {
-    return;
-  }
-
-  editingPlayer.value = PlayerService.getPlayerById(playerId) ?? null;
-  feedbackErrors.value = [];
-  feedbackMessage.value = null;
-  isFormOpen.value = editingPlayer.value !== null;
-}
-
-function closeForm(): void {
-  isFormOpen.value = false;
-  editingPlayer.value = null;
-}
-
-function handleResult<T>(result: ServiceResult<T>, successMessage: string): boolean {
+async function handleDelete(id: string): Promise<void> {
+  const result = await deleteRecord(id, confirmDeletion);
   if (!result.success) {
-    feedbackErrors.value = result.errors;
-    feedbackMessage.value = null;
-    return false;
-  }
-
-  feedbackErrors.value = [];
-  feedbackMessage.value = successMessage;
-  refreshPlayers();
-  closeForm();
-  return true;
-}
-
-function handleSubmit(payload: CreatePlayerDTO): void {
-  if (editingPlayer.value === null) {
-    handleResult(PlayerService.createPlayer(payload), 'Player created successfully.');
+    await showError(result.errors.join(' '));
     return;
   }
-
-  handleResult(
-    PlayerService.updatePlayer(editingPlayer.value.id, payload),
-    'Player updated successfully.',
-  );
-}
-
-async function handleDelete(playerId: string): Promise<void> {
-  if (!authStore.isAdmin) {
-    return;
-  }
-
-  const player = PlayerService.getPlayerById(playerId);
-  const confirmed = await confirmDeletion(player?.name ?? 'this player');
-
-  if (!confirmed) {
-    return;
-  }
-
-  const result = PlayerService.deletePlayer(playerId);
-
-  if (!result.success) {
-    feedbackErrors.value = [];
-    feedbackMessage.value = null;
-    await showError(result.errors.join(' ') || 'This player could not be deleted.');
-    return;
-  }
-
-  feedbackErrors.value = [];
-  feedbackMessage.value = null;
-  refreshPlayers();
-  closeForm();
-  await showSuccess('Player deleted successfully.');
+  if (result.data) await showSuccess('Player deleted successfully.');
 }
 </script>
 
@@ -208,6 +155,7 @@ async function handleDelete(playerId: string): Promise<void> {
           v-if="authStore.isAdmin"
           type="button"
           class="button-primary"
+          :disabled="isBusy || !isReady"
           @click="openCreateForm"
         >
           Add player
@@ -215,52 +163,79 @@ async function handleDelete(playerId: string): Promise<void> {
       </template>
     </PageHeader>
 
-    <OperationFeedback :errors="feedbackErrors" :success-message="feedbackMessage" />
+    <ApiLoadState
+      :is-loading="isLoading"
+      :errors="loadErrors"
+      :has-loaded="hasLoaded"
+      :is-empty="players.length === 0"
+      @retry="loadData"
+    />
+
+    <OperationFeedback
+      :errors="isFormOpen ? [] : feedbackErrors"
+      :success-message="feedbackMessage"
+    />
 
     <PlayerFormPanel
-      v-if="isFormOpen"
+      v-if="isFormOpen && authStore.isAdmin"
       :editing-player="editingPlayer"
+      :is-submitting="isSaving"
+      :is-disabled="isBusy || !isReady || !authStore.isAdmin"
+      :is-stale="isStale"
+      :errors="feedbackErrors"
       :teams="teams"
       @submit="handleSubmit"
       @cancel="closeForm"
     />
 
-    <section class="filters-bar">
-      <FilterSelect v-model="teamFilter" label="Team" :options="teamOptions" />
-      <FilterSelect v-model="positionFilter" label="Position" :options="positionOptions" />
-      <FilterSelect v-model="statusFilter" label="Status" :options="statusOptions" />
-      <label class="search-field">
-        <span>Search by name</span>
-        <input v-model="nameSearch" type="search" placeholder="Player name" />
-      </label>
-    </section>
+    <template v-if="isReady">
+      <section class="filters-bar">
+        <FilterSelect v-model="teamFilter" label="Team" :options="teamOptions" />
+        <FilterSelect v-model="positionFilter" label="Position" :options="positionOptions" />
+        <FilterSelect v-model="statusFilter" label="Status" :options="statusOptions" />
+        <label class="search-field">
+          <span>Search by name</span>
+          <input v-model="nameSearch" type="search" placeholder="Player name" />
+        </label>
+      </section>
 
-    <ChartCard
-      title="Top scorers"
-      description="The five highest goal scorers among the currently filtered players."
-      type="bar"
-      :data="topScorersChart"
-      :options="{ plugins: { legend: { display: false } } }"
-    />
+      <ChartCard
+        title="Top scorers"
+        description="The five highest goal scorers among the currently filtered players."
+        type="bar"
+        :data="topScorersChart"
+        :options="{ plugins: { legend: { display: false } } }"
+      />
 
-    <DataTable
-      :columns="playerColumns"
-      :rows="playerRows"
-      row-key="id"
-      caption="Players and their current season contributions"
-      empty-message="No players match the selected filters."
-    >
-      <template #cell-actions="{ row }">
-        <div class="row-actions">
-          <button type="button" class="link-button" @click="openEditForm(String(row.id))">
-            Edit
-          </button>
-          <button type="button" class="link-button danger" @click="handleDelete(String(row.id))">
-            Delete
-          </button>
-        </div>
-      </template>
-    </DataTable>
+      <DataTable
+        :columns="playerColumns"
+        :rows="playerRows"
+        row-key="id"
+        caption="Players and their current season contributions"
+        empty-message="No players match the selected filters."
+      >
+        <template #cell-actions="{ row }">
+          <div class="row-actions">
+            <button
+              type="button"
+              class="link-button"
+              :disabled="isBusy"
+              @click="openEditForm(String(row.id))"
+            >
+              Edit
+            </button>
+            <button
+              type="button"
+              class="link-button danger"
+              :disabled="isBusy"
+              @click="handleDelete(String(row.id))"
+            >
+              Delete
+            </button>
+          </div>
+        </template>
+      </DataTable>
+    </template>
   </div>
 </template>
 

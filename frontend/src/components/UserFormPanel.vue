@@ -1,22 +1,32 @@
 <script setup lang="ts">
 import { reactive, watch } from 'vue';
 
+import OperationFeedback from '@/components/OperationFeedback.vue';
 import type { CreateUserDTO } from '@/dtos/CreateUserDTO.js';
 import type { UpdateUserDTO } from '@/dtos/UpdateUserDTO.js';
 import type { UserInterface } from '@/interfaces/UserInterface.js';
 
 interface Props {
   editingUser: UserInterface | null;
+  isSubmitting?: boolean;
+  isDisabled?: boolean;
+  isStale?: boolean;
+  errors?: string[];
 }
 
 interface UserFormState {
   name: string;
   email: string;
   password: string;
-  role: string;
+  role: 'admin' | 'user';
 }
 
-const props = defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), {
+  isSubmitting: false,
+  isDisabled: false,
+  isStale: false,
+  errors: () => [],
+});
 
 const emit = defineEmits<{
   create: [payload: CreateUserDTO];
@@ -54,6 +64,7 @@ watch(
 );
 
 function handleSubmit(): void {
+  if (props.isSubmitting || props.isDisabled || props.isStale) return;
   if (props.editingUser === null) {
     const payload: CreateUserDTO = { ...form };
     emit('create', payload);
@@ -75,10 +86,12 @@ function handleSubmit(): void {
 </script>
 
 <template>
-  <form class="user-form" @submit.prevent="handleSubmit">
+  <form class="user-form" :aria-busy="props.isSubmitting" @submit.prevent="handleSubmit">
     <h3>{{ props.editingUser === null ? 'Create user' : 'Edit user' }}</h3>
 
-    <div class="form-grid">
+    <OperationFeedback :errors="props.errors" />
+
+    <fieldset class="form-grid" :disabled="props.isSubmitting || props.isDisabled || props.isStale">
       <label>
         <span>Name</span>
         <input v-model="form.name" type="text" autocomplete="name" required />
@@ -108,17 +121,34 @@ function handleSubmit(): void {
         />
         <small v-if="props.editingUser !== null">Leave blank to keep the current password.</small>
       </label>
-    </div>
+    </fieldset>
 
     <p class="password-help">
       Passwords require at least 8 characters, one uppercase letter, one lowercase letter, and one
-      number.
+      number, and must not exceed 72 UTF-8 bytes.
     </p>
 
     <div class="form-actions">
-      <button type="button" class="button-secondary" @click="emit('cancel')">Cancel</button>
-      <button type="submit" class="button-primary">
-        {{ props.editingUser === null ? 'Create user' : 'Save changes' }}
+      <button
+        type="button"
+        class="button-secondary"
+        :disabled="props.isSubmitting"
+        @click="emit('cancel')"
+      >
+        Cancel
+      </button>
+      <button
+        type="submit"
+        class="button-primary"
+        :disabled="props.isSubmitting || props.isDisabled || props.isStale"
+      >
+        {{
+          props.isSubmitting
+            ? 'Saving...'
+            : props.editingUser === null
+              ? 'Create user'
+              : 'Save changes'
+        }}
       </button>
     </div>
   </form>
@@ -141,6 +171,10 @@ function handleSubmit(): void {
 }
 
 .form-grid {
+  margin: 0;
+  padding: 0;
+  border: none;
+  min-width: 0;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.85rem;
@@ -218,8 +252,18 @@ small,
   background-color: #f8fafc;
 }
 
+.button-primary:disabled,
+.button-secondary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 @media (max-width: 640px) {
   .form-grid {
+    margin: 0;
+    padding: 0;
+    border: none;
+    min-width: 0;
     grid-template-columns: 1fr;
   }
 }

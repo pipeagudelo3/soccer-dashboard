@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { reactive, watch } from 'vue';
 
+import OperationFeedback from '@/components/OperationFeedback.vue';
+
 import type { CreatePlayerDTO } from '@/dtos/CreatePlayerDTO.js';
 import type { PlayerInterface } from '@/interfaces/PlayerInterface.js';
 import type { TeamInterface } from '@/interfaces/TeamInterface.js';
@@ -17,11 +19,20 @@ interface PlayerFormState {
 const STATUS_OPTIONS = ['active', 'injured', 'suspended', 'free-agent'];
 
 interface Props {
+  isSubmitting?: boolean;
+  isDisabled?: boolean;
+  isStale?: boolean;
+  errors?: string[];
   editingPlayer: PlayerInterface | null;
   teams: TeamInterface[];
 }
 
-const props = defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), {
+  isSubmitting: false,
+  isDisabled: false,
+  isStale: false,
+  errors: () => [],
+});
 
 const emit = defineEmits<{
   submit: [payload: CreatePlayerDTO];
@@ -49,12 +60,20 @@ watch(
       return;
     }
 
-    Object.assign(form, { ...player, teamId: player.teamId ?? '' });
+    Object.assign(form, {
+      name: player.name,
+      position: player.position,
+      status: player.status,
+      teamId: player.teamId ?? '',
+      goals: player.goals,
+      assists: player.assists,
+    });
   },
   { immediate: true },
 );
 
 function handleSubmit(): void {
+  if (props.isSubmitting || props.isDisabled || props.isStale) return;
   const payload: CreatePlayerDTO = {
     name: form.name,
     position: form.position,
@@ -69,19 +88,33 @@ function handleSubmit(): void {
 </script>
 
 <template>
-  <form class="player-form" @submit.prevent="handleSubmit">
+  <form class="player-form" :aria-busy="props.isSubmitting" @submit.prevent="handleSubmit">
     <h3>{{ props.editingPlayer === null ? 'Create player' : 'Edit player' }}</h3>
 
+    <OperationFeedback :errors="props.errors" />
+    <p v-if="props.isStale" role="alert">
+      This record no longer exists. Cancel editing and reload the list.
+    </p>
     <fieldset>
       <legend>Identification</legend>
       <div class="form-grid">
         <label>
           <span>Name</span>
-          <input v-model="form.name" type="text" required />
+          <input
+            :disabled="props.isSubmitting || props.isDisabled || props.isStale"
+            v-model="form.name"
+            type="text"
+            required
+          />
         </label>
         <label>
           <span>Position</span>
-          <input v-model="form.position" type="text" required />
+          <input
+            :disabled="props.isSubmitting || props.isDisabled || props.isStale"
+            v-model="form.position"
+            type="text"
+            required
+          />
         </label>
       </div>
     </fieldset>
@@ -91,8 +124,18 @@ function handleSubmit(): void {
       <div class="form-grid">
         <label>
           <span>Team</span>
-          <select v-model="form.teamId">
+          <select
+            :disabled="props.isSubmitting || props.isDisabled || props.isStale"
+            v-model="form.teamId"
+          >
             <option value="">Free agent (no team)</option>
+            <option
+              v-if="form.teamId !== '' && !props.teams.some((team) => team.id === form.teamId)"
+              :value="form.teamId"
+              disabled
+            >
+              Selected team is unavailable; choose another team
+            </option>
             <option v-for="team in props.teams" :key="team.id" :value="team.id">
               {{ team.name }}
             </option>
@@ -100,7 +143,10 @@ function handleSubmit(): void {
         </label>
         <label>
           <span>Status</span>
-          <select v-model="form.status">
+          <select
+            :disabled="props.isSubmitting || props.isDisabled || props.isStale"
+            v-model="form.status"
+          >
             <option v-for="status in STATUS_OPTIONS" :key="status" :value="status">
               {{ status }}
             </option>
@@ -114,18 +160,43 @@ function handleSubmit(): void {
       <div class="form-grid">
         <label>
           <span>Goals</span>
-          <input v-model.number="form.goals" type="number" min="0" step="1" required />
+          <input
+            :disabled="props.isSubmitting || props.isDisabled || props.isStale"
+            v-model.number="form.goals"
+            type="number"
+            min="0"
+            step="1"
+            required
+          />
         </label>
         <label>
           <span>Assists</span>
-          <input v-model.number="form.assists" type="number" min="0" step="1" required />
+          <input
+            :disabled="props.isSubmitting || props.isDisabled || props.isStale"
+            v-model.number="form.assists"
+            type="number"
+            min="0"
+            step="1"
+            required
+          />
         </label>
       </div>
     </fieldset>
 
     <div class="form-actions">
-      <button type="button" class="button-secondary" @click="emit('cancel')">Cancel</button>
-      <button type="submit" class="button-primary">
+      <button
+        type="button"
+        class="button-secondary"
+        :disabled="props.isSubmitting"
+        @click="emit('cancel')"
+      >
+        Cancel
+      </button>
+      <button
+        type="submit"
+        class="button-primary"
+        :disabled="props.isSubmitting || props.isDisabled || props.isStale"
+      >
         {{ props.editingPlayer === null ? 'Create player' : 'Save changes' }}
       </button>
     </div>

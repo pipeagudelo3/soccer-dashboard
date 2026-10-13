@@ -1,22 +1,39 @@
 <script setup lang="ts">
-import { RouterView } from 'vue-router';
+import { ref } from 'vue';
+import { RouterView, useRoute } from 'vue-router';
 
 import AppHeader from '@/components/AppHeader.vue';
 import { useAuthStore } from '@/stores/authstore.js';
 
+const mainContent = ref<HTMLElement | null>(null);
 const authStore = useAuthStore();
+const route = useRoute();
+
+function focusMainContent(): void {
+  mainContent.value?.focus({ preventScroll: true });
+  mainContent.value?.scrollIntoView({ block: 'start' });
+}
 </script>
 
 <template>
   <div class="app-shell">
+    <a href="#main-content" class="skip-link" @click.prevent="focusMainContent">
+      Skip to main content
+    </a>
+
     <AppHeader
+      v-if="!authStore.isSessionLoading"
       :is-authenticated="authStore.isAuthenticated"
       :user-name="authStore.currentUser?.name ?? null"
       :user-role="authStore.currentUser?.role ?? null"
     />
 
-    <main class="main-content">
-      <RouterView />
+    <main id="main-content" ref="mainContent" class="main-content" tabindex="-1">
+      <p v-if="authStore.isSessionLoading" role="status" aria-live="polite">
+        Checking your session...
+      </p>
+      <RouterView v-else-if="route.meta.requiresAuth !== true || authStore.isAuthenticated" />
+      <p v-else role="status">Redirecting to login...</p>
     </main>
 
     <footer class="app-footer">
@@ -38,6 +55,7 @@ const authStore = useAuthStore();
   width: min(100% - 2rem, 1200px);
   margin: 0 auto;
   padding: 2rem 0;
+  scroll-margin-top: calc(var(--header-height) + 0.5rem);
 }
 
 .app-footer {

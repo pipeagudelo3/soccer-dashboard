@@ -1,12 +1,16 @@
 <script setup lang="ts">
 import { reactive, watch } from 'vue';
 
+import OperationFeedback from '@/components/OperationFeedback.vue';
 import type { CreateMatchStatsDTO } from '@/dtos/CreateMatchStatsDTO.js';
-import type { UpdateMatchStatsDTO } from '@/dtos/UpdateMatchStatsDTO.js';
 import type { MatchStatsInterface } from '@/interfaces/MatchStatsInterface.js';
 import type { TeamInterface } from '@/interfaces/TeamInterface.js';
 
 interface Props {
+  isSubmitting?: boolean;
+  isDisabled?: boolean;
+  isStale?: boolean;
+  errors?: string[];
   editingMatchStats: MatchStatsInterface | null;
   teams: TeamInterface[];
 }
@@ -21,12 +25,15 @@ interface MatchStatsFormState {
   attendance: number;
 }
 
-const props = defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), {
+  isSubmitting: false,
+  isDisabled: false,
+  isStale: false,
+  errors: () => [],
+});
 
 const emit = defineEmits<{
-  create: [payload: CreateMatchStatsDTO];
-  update: [payload: UpdateMatchStatsDTO];
-  invalid: [errors: string[]];
+  submit: [payload: CreateMatchStatsDTO];
   cancel: [];
 }>();
 
@@ -66,14 +73,7 @@ watch(
 );
 
 function handleSubmit(): void {
-  if (
-    !props.teams.some((team) => team.id === form.homeTeamId) ||
-    !props.teams.some((team) => team.id === form.awayTeamId)
-  ) {
-    emit('invalid', ['Select an existing home team and away team.']);
-    return;
-  }
-
+  if (props.isSubmitting || props.isDisabled || props.isStale) return;
   const payload: CreateMatchStatsDTO = {
     date: form.date,
     homeTeamId: form.homeTeamId,
@@ -84,36 +84,58 @@ function handleSubmit(): void {
     attendance: form.attendance,
   };
 
-  if (props.editingMatchStats === null) {
-    emit('create', payload);
-  } else {
-    const updatePayload: UpdateMatchStatsDTO = payload;
-    emit('update', updatePayload);
-  }
+  emit('submit', payload);
 }
 </script>
 
 <template>
-  <form class="match-stats-form" @submit.prevent="handleSubmit">
+  <form class="match-stats-form" :aria-busy="props.isSubmitting" @submit.prevent="handleSubmit">
     <h3>
       {{ props.editingMatchStats === null ? 'Create match statistics' : 'Edit match statistics' }}
     </h3>
 
+    <OperationFeedback :errors="props.errors" />
+    <p v-if="props.isStale" role="alert">
+      This match no longer exists. Cancel editing and reload the list.
+    </p>
     <div class="form-grid">
       <label>
         <span>Date</span>
-        <input v-model="form.date" type="date" required />
+        <input
+          :disabled="props.isSubmitting || props.isDisabled || props.isStale"
+          v-model="form.date"
+          type="date"
+          required
+        />
       </label>
 
       <label>
         <span>Stadium</span>
-        <input v-model="form.stadium" type="text" required />
+        <input
+          :disabled="props.isSubmitting || props.isDisabled || props.isStale"
+          v-model="form.stadium"
+          type="text"
+          required
+        />
       </label>
 
       <label>
         <span>Home team</span>
-        <select v-model="form.homeTeamId" required>
+        <select
+          :disabled="props.isSubmitting || props.isDisabled || props.isStale"
+          v-model="form.homeTeamId"
+          required
+        >
           <option value="" disabled>Select a team</option>
+          <option
+            v-if="
+              form.homeTeamId !== '' && !props.teams.some((team) => team.id === form.homeTeamId)
+            "
+            :value="form.homeTeamId"
+            disabled
+          >
+            Selected team is unavailable; choose another team
+          </option>
           <option
             v-for="team in props.teams"
             :key="team.id"
@@ -127,8 +149,21 @@ function handleSubmit(): void {
 
       <label>
         <span>Away team</span>
-        <select v-model="form.awayTeamId" required>
+        <select
+          :disabled="props.isSubmitting || props.isDisabled || props.isStale"
+          v-model="form.awayTeamId"
+          required
+        >
           <option value="" disabled>Select a team</option>
+          <option
+            v-if="
+              form.awayTeamId !== '' && !props.teams.some((team) => team.id === form.awayTeamId)
+            "
+            :value="form.awayTeamId"
+            disabled
+          >
+            Selected team is unavailable; choose another team
+          </option>
           <option
             v-for="team in props.teams"
             :key="team.id"
@@ -142,23 +177,55 @@ function handleSubmit(): void {
 
       <label>
         <span>Home team goals</span>
-        <input v-model.number="form.goalsHomeTeam" type="number" min="0" step="1" required />
+        <input
+          :disabled="props.isSubmitting || props.isDisabled || props.isStale"
+          v-model.number="form.goalsHomeTeam"
+          type="number"
+          min="0"
+          step="1"
+          required
+        />
       </label>
 
       <label>
         <span>Away team goals</span>
-        <input v-model.number="form.goalsAwayTeam" type="number" min="0" step="1" required />
+        <input
+          :disabled="props.isSubmitting || props.isDisabled || props.isStale"
+          v-model.number="form.goalsAwayTeam"
+          type="number"
+          min="0"
+          step="1"
+          required
+        />
       </label>
 
       <label class="form-grid-full">
         <span>Attendance</span>
-        <input v-model.number="form.attendance" type="number" min="0" step="1" required />
+        <input
+          :disabled="props.isSubmitting || props.isDisabled || props.isStale"
+          v-model.number="form.attendance"
+          type="number"
+          min="0"
+          step="1"
+          required
+        />
       </label>
     </div>
 
     <div class="form-actions">
-      <button type="button" class="button-secondary" @click="emit('cancel')">Cancel</button>
-      <button type="submit" class="button-primary">
+      <button
+        type="button"
+        class="button-secondary"
+        :disabled="props.isSubmitting"
+        @click="emit('cancel')"
+      >
+        Cancel
+      </button>
+      <button
+        type="submit"
+        class="button-primary"
+        :disabled="props.isSubmitting || props.isDisabled || props.isStale"
+      >
         {{ props.editingMatchStats === null ? 'Create match statistics' : 'Save changes' }}
       </button>
     </div>
