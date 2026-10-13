@@ -42,6 +42,19 @@ describe('validateEnvironment', () => {
     expect(configuration.SQLITE_PATH).toBe('/data/database.sqlite');
   });
 
+  it('parses a comma-separated CORS allowlist, trimming spaces', () => {
+    const configuration = validateEnvironment({
+      ...testEnvironment,
+      CORS_ORIGIN: 'http://localhost:5173, https://app.soccer.example ,http://127.0.0.1:4173',
+    });
+
+    expect(configuration.CORS_ORIGIN).toEqual([
+      'http://localhost:5173',
+      'https://app.soccer.example',
+      'http://127.0.0.1:4173',
+    ]);
+  });
+
   it.each([
     ['NODE_ENV', 'invalid'],
     ['PORT', '0'],
@@ -61,6 +74,7 @@ describe('validateEnvironment', () => {
     ['SQLITE_SYNCHRONIZE', 'invalid'],
     ['CORS_ORIGIN', '*'],
     ['CORS_ORIGIN', 'http://localhost:5173/path'],
+    ['CORS_ORIGIN', 'https://soccer.example.com/'],
     ['CORS_ORIGIN', 'ftp://soccer.example.com'],
     ['CORS_ORIGIN', 'http://localhost:5173,'],
   ])('rejects invalid %s configuration (%s)', (name, value) => {

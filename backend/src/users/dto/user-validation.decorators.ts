@@ -4,6 +4,9 @@ import { IsEmail, IsIn, IsNotEmpty, IsString, ValidateBy } from 'class-validator
 
 import { isValidPassword } from '../password-policy.js';
 
+// Roles del modelo aprobado; validación y documentación OpenAPI usan la misma lista.
+export const USER_ROLES = ['admin', 'user'] as const;
+
 // Recorta únicamente texto; los valores de otro tipo llegan intactos al validador.
 export function UserName(): PropertyDecorator {
   return applyDecorators(
@@ -40,5 +43,5 @@ export function UserPassword(): PropertyDecorator {
 
 // Limita los permisos a los dos roles del modelo aprobado.
 export function UserRole(): PropertyDecorator {
-  return applyDecorators(IsString(), IsIn(['admin', 'user']));
+  return applyDecorators(IsString(), IsIn(USER_ROLES));
 }
