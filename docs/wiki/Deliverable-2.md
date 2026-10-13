@@ -273,6 +273,8 @@ La prueba manual debe cubrir login/logout, permisos, CRUD, relaciones, filtros, 
 
 ## 11. Despliegue
 
+`main` contiene actualmente una primera imagen del frontend servida por Nginx. Este es un paso preliminar y no equivale todavía al despliegue full stack aprobado: faltan integrar/verificar el contenedor backend, Compose, health checks, configuración de la API y persistencia del volumen SQLite. La construcción definitiva tampoco debe depender de artefactos `dist` generados manualmente y versionados.
+
 La infraestructura final en GCP se documentará únicamente después de verificar el stack Docker/Compose, la URL pública, CORS, persistencia del volumen y reinicios. Hasta entonces, los diagramas marcan GCP como destino pendiente y no afirman una ruta pública inexistente.
 
 ## 12. Mantenimiento documental
