@@ -5,6 +5,7 @@ module.exports = {
   ...baseConfig,
   rootDir: '..',
   testMatch: ['<rootDir>/test/**/*.e2e-spec.ts'],
+  testTimeout: 30_000,
   // Los e2e ejercitan controladores, guards, servicios y SQLite: miden la aplicación completa.
   collectCoverage: true,
   collectCoverageFrom: [

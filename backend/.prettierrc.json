@@ -2,6 +2,5 @@
   "$schema": "https://json.schemastore.org/prettierrc",
   "semi": true,
   "singleQuote": true,
-  "endOfLine": "auto",
   "printWidth": 100
 }
