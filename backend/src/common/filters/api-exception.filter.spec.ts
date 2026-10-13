@@ -82,6 +82,31 @@ describe('ApiExceptionFilter', () => {
     );
   });
 
+  it('keeps the status and safe message of body-parser client errors', () => {
+    const exception = Object.assign(new Error('request entity too large'), {
+      status: 413,
+      expose: true,
+    });
+
+    new ApiExceptionFilter().catch(exception, host);
+
+    expect(logError).not.toHaveBeenCalled();
+    expect(status).toHaveBeenCalledWith(413);
+    expect(json.mock.calls[0]?.[0]).toEqual(
+      expect.objectContaining({ statusCode: 413, message: ['request entity too large'] }),
+    );
+  });
+
+  it('does not trust unexposed errors that merely carry a status', () => {
+    new ApiExceptionFilter().catch(Object.assign(new Error(privateValue), { status: 413 }), host);
+
+    expect(status).toHaveBeenCalledWith(500);
+    expect(json.mock.calls[0]?.[0]).toEqual(
+      expect.objectContaining({ message: ['Internal server error.'] }),
+    );
+    expect(JSON.stringify(json.mock.calls)).not.toContain(privateValue);
+  });
+
   it('does not serialize arbitrary thrown objects', () => {
     new ApiExceptionFilter().catch({ password: privateValue, stack: privateValue }, host);
     expect(logError).toHaveBeenCalledWith(
