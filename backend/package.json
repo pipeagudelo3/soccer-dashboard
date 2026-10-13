@@ -22,6 +22,7 @@
     "test:watch": "npm test -- --watch",
     "test:cov": "npm test -- --coverage",
     "test:e2e": "node --experimental-vm-modules node_modules/jest/bin/jest.js --config test/jest-e2e.config.cjs --runInBand",
+    "test:random": "npm test -- --randomize && npm run test:e2e -- --randomize",
     "verify": "npm run lint && npm run format:check && npm run type-check && npm run test:cov && npm run test:e2e && npm run build",
     "migration:run": "npm run build && node --env-file-if-exists=.env --env-file-if-exists=.env.local node_modules/typeorm/cli.js migration:run -d dist/database/data-source.js",
     "migration:show": "npm run build && node --env-file-if-exists=.env --env-file-if-exists=.env.local node_modules/typeorm/cli.js migration:show -d dist/database/data-source.js",
