@@ -7,7 +7,6 @@ import { fileURLToPath } from 'node:url';
 import { createPinia, setActivePinia } from 'pinia';
 import { createServer } from 'vite';
 import type { ViteDevServer } from 'vite';
-import { effectScope, nextTick } from 'vue';
 import { createMemoryHistory, createRouter } from 'vue-router';
 import type { Router } from 'vue-router';
 
@@ -16,8 +15,6 @@ let auth: typeof import('../src/services/AuthService.js');
 let stores: typeof import('../src/stores/authstore.js');
 let guards: typeof import('../src/router/authenticationGuard.js');
 let navigation: typeof import('../src/router/sessionNavigation.js');
-let persistence: typeof import('../src/PiniaConfig.js');
-let userStores: typeof import('../src/stores/userstore.js');
 let api: typeof import('../src/services/ApiService.js');
 let handler: (request: IncomingMessage, response: ServerResponse) => void;
 let requestCount = 0;
@@ -95,8 +92,6 @@ before(async () => {
   stores = (await vite.ssrLoadModule('/src/stores/authstore.ts')) as typeof stores;
   guards = (await vite.ssrLoadModule('/src/router/authenticationGuard.ts')) as typeof guards;
   navigation = (await vite.ssrLoadModule('/src/router/sessionNavigation.ts')) as typeof navigation;
-  persistence = (await vite.ssrLoadModule('/src/PiniaConfig.ts')) as typeof persistence;
-  userStores = (await vite.ssrLoadModule('/src/stores/userstore.ts')) as typeof userStores;
   api = (await vite.ssrLoadModule('/src/services/ApiService.ts')) as typeof api;
 });
 
@@ -182,16 +177,6 @@ test('normalizes email, preserves password bytes and stores only the backend pro
 });
 
 test('rejects fictional local credentials and never authenticates against userstore', async () => {
-  userStores.useUserStore().users = [
-    {
-      id: userId,
-      name: 'Local Admin',
-      email: 'local@example.test',
-      role: 'admin',
-      createdAt: 'test',
-      updatedAt: 'test',
-    },
-  ];
   const result = await auth.AuthService.login({
     email: 'local@example.test',
     password: 'Local123!',
@@ -343,75 +328,6 @@ test('expiry automatically clears the session even without another HTTP request'
   assert.equal((await loginAsUser()).success, true);
   await waitFor(() => stores.useAuthStore().accessToken === null);
   assert.equal(auth.AuthService.isAuthenticated(), false);
-});
-
-test('local user edits/deletions cannot change the backend-authenticated profile or role', async () => {
-  await loginAsAdmin();
-  const stored = {
-    id: adminId,
-    name: 'Local Copy',
-    email: 'copy@example.test',
-    role: 'admin' as const,
-    createdAt: 'test',
-    updatedAt: 'test',
-  };
-  userStores.useUserStore().users = [
-    stored,
-    { ...stored, id: userId, email: 'other@example.test' },
-  ];
-  userStores.useUserStore().updateUser({ ...stored, name: 'Local Edit', role: 'user' });
-  assert.equal(auth.AuthService.getCurrentUser()?.name, 'Backend Admin');
-  assert.equal(auth.AuthService.isAdmin(), true);
-  userStores.useUserStore().removeUser(adminId);
-  assert.equal(auth.AuthService.isAuthenticated(), true);
-});
-
-test('a browser reload ignores persisted auth but preserves domain state', async () => {
-  const values = new Map<string, string>();
-  const storage = {
-    getItem: (key: string) => values.get(key) ?? null,
-    setItem: (key: string, value: string) => {
-      values.set(key, value);
-    },
-  };
-  const oldStorage = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
-  Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: storage });
-  const scope = effectScope();
-  try {
-    const pinia = createPinia();
-    setActivePinia(pinia);
-    scope.run(() => persistence.configurePinia(pinia));
-    await loginAsUser();
-    await nextTick();
-    const token = stores.useAuthStore().accessToken;
-    assert.ok(token !== null);
-    const saved = storage.getItem(persistence.piniaStateKey) ?? '{}';
-    assert.ok(!saved.includes(token));
-    assert.ok(!saved.includes('Backend User'));
-    const snapshot = JSON.parse(saved) as { state: Record<string, unknown>; version: number };
-    const teams = snapshot.state.teams;
-    snapshot.state.auth = {
-      currentUser: { ...profile, role: 'admin' },
-      accessToken: token,
-      expiresAt: Date.now() + 900000,
-      isSessionVerified: true,
-    };
-    auth.AuthService.logout();
-    storage.setItem(persistence.piniaStateKey, JSON.stringify(snapshot));
-    const reloaded = createPinia();
-    setActivePinia(reloaded);
-    scope.run(() => persistence.configurePinia(reloaded));
-    await auth.AuthService.reconcileSession();
-    assert.equal(stores.useAuthStore().accessToken, null);
-    assert.equal(stores.useAuthStore().currentUser, null);
-    assert.equal(auth.AuthService.isAuthenticated(), false);
-    assert.deepEqual(reloaded.state.value.teams, teams);
-    assert.equal(requestCount, 1);
-  } finally {
-    scope.stop();
-    if (oldStorage === undefined) Reflect.deleteProperty(globalThis, 'localStorage');
-    else Object.defineProperty(globalThis, 'localStorage', oldStorage);
-  }
 });
 
 test('guest admin URLs redirect once to login and preserve the intended destination', async () => {

@@ -17,7 +17,7 @@ the project.
 ## Project setup
 
 ```sh
-npm install
+npm ci
 ```
 
 ## Development
@@ -84,7 +84,7 @@ configuration produces a safe failure; there is no silent localhost fallback.
 
 The request interceptor reads `useAuthStore().accessToken` for each request. AuthService establishes
 the token, minimal profile and expiry after a successful backend login. The complete auth state is
-kept in memory and excluded from both saving and loading `piniaState`. Logout clears it. Reloading
+kept only in memory. The retired `piniaState` key is deleted at startup. Logout clears the session. Reloading
 does not restore a token or a persisted identity.
 Public authentication requests must use `requiresAuth: false`, so invalid login credentials cannot
 invalidate an existing session.
@@ -102,7 +102,7 @@ are never logged or returned by these services. Server errors remain generic.
 The shared transport layer is implemented in #50, backend login/session handling in #51 and Users
 administration in #52. Teams and Players reads/CRUD use the backend in #53. Charts, comparison and
 match-statistics browsing read recorded backend matches to join the same UUID relationships.
-MatchStats administration remains local until its own migration. Runtime login requires backend
+MatchStats administration and analytical consumers now use the same backend in #54. Runtime login requires backend
 JWT (#47, PR #63); the client uses the approved #39 contract.
 
 ### HTTP client tests
@@ -115,7 +115,7 @@ npm audit            # Audit all frontend dependencies, including development to
 
 Tests cover real request serialization, headers, token changes, public login, concurrent/stale 401s,
 validation/status errors, network failures, cancellation, unsafe endpoints, environment validation
-and token exclusion from Pinia persistence. No additional test dependency is required.
+and memory-only token handling. No additional test dependency is required.
 
 ## Backend login and session — #51
 
@@ -146,8 +146,8 @@ an account after logout or replace a newer login.
 
 ### Refresh and the approved memory-only contract
 
-A full browser reload discards the token. The frontend ignores persisted backend-owned domain
-state, preserves only the remaining local match-administration state and returns to login when a protected page is requested. It does not recreate a session
+A full browser reload discards the token. The frontend removes the retired backend-owned domain
+snapshot and returns to login when a protected page is requested. It does not recreate a session
 from a saved profile, LocalStorage or SessionStorage. This interprets the issue's refresh criterion
 under the approved #39 decision: there is no persistent login across a full reload. If an in-memory
 token is available during SPA navigation/reconciliation, it is accepted only after `/auth/me`.
@@ -184,11 +184,9 @@ it never overwrites the existing password with an empty value. DTO fields are ex
 before sending, so IDs, timestamps and arbitrary properties are not writable.
 
 The page uses the `useUserAdministration` composable for ephemeral loading, list, form and feedback
-state. It never reads the local user domain store or browser storage. Pinia configuration ignores
-and excludes auth, users, teams and players from active persisted snapshots and preserves only the
-remaining local match domain. It no longer runs the local user/team/player seeders. The old user store/seeder files remain only for
-legacy compatibility; they are not used by backend administration, and the fictional seeder no
-longer contains password fields. Existing legacy migration backups are not used as a Users database.
+state. It never reads a local domain store or browser storage. Pinia is used only for the
+in-memory authentication state. Obsolete domain stores, seeders and persistence have been removed;
+the old `piniaState` key is deleted at startup without loading its contents.
 
 Initial loading, empty results, errors and explicit retry/reload states are visible. During writes,
 form fields and duplicate submission are blocked; validation/conflict errors stay inline and keep
@@ -216,9 +214,9 @@ A successful write is not reported as failed merely because a later profile chec
 ### Validation and manual evaluation
 
 `npm run verify` includes transport, authentication/navigation, Users administration and
-Teams/Players integration tests. The 36 Users service, page-state, form-rendering and lifecycle tests cover DTO serialization, safe responses, permissions,
+Teams/Players integration tests. Users service, page-state, form-rendering and lifecycle tests cover DTO serialization, safe responses, permissions,
 validation/conflicts, loading/retry/empty states, stale records, races, self-update/self-delete,
-legacy snapshot exclusion and preservation of inline form feedback. Test Vite servers disable
+API contract isolation and preservation of inline form feedback. Test Vite servers disable
 HMR/WebSocket because no browser hot reload is needed; parallel files no longer compete for port 24678. No dependency was added for this requirement.
 
 A separate check uses the actual NestJS backend and isolated SQLite data to verify CRUD, normalized
@@ -273,18 +271,11 @@ mutated to predict those outcomes. A successful DELETE remains successful even i
 read fails; the loading error and retry action show that the refreshed snapshot is unavailable.
 Reloading and signing in again fetches the persisted database records.
 
-### Match-data transition
+### Shared match data after #54
 
-RecordedMatchService provides **read-only** backend match snapshots for charts, statistics,
-comparison, Home/Dashboard summaries and MatchStats browsing. This small bridge is necessary for
-#53: backend team UUIDs cannot be joined with the old fictional match IDs. It introduces no match
-mutation API and does not complete the separate MatchStats administration requirement.
-
-AdminMatchStatsView still edits its legacy browser-local records. Its team selectors now await live
-teams; local create/update awaits that validation and blocks concurrent submits. The page clearly
-labels that these edits do not change database matches shown elsewhere. Old fictional team IDs
-are shown as unavailable rather than remapped by guessed names. MatchStats administration must be
-migrated in its own requirement before this temporary separation is removed.
+The temporary separation introduced in #53 is removed in #54: both administration and analytical
+pages use MatchStatsService and the database records. The unused RecordedMatchService compatibility
+alias was removed in #55; no consumer reads local match stores.
 
 ### Verification and evaluation
 
@@ -307,6 +298,84 @@ unassigned after the server operation. Reload/sign in again and confirm persiste
 regular account, both pages must be read-only. Stop the backend to inspect error/retry states and
 resume it before retrying. Automated checks do not claim a manual desktop-browser evaluation.
 
+## Backend MatchStats and analytical views — #54
+
+MatchStatsService uses GET collection/detail, POST, PATCH and DELETE of `/match-stats` through the
+existing typed REST resource and ApiService. Public responses preserve ten properties: id, date,
+homeTeamId, awayTeamId, goalsHomeTeam, goalsAwayTeam, stadium, attendance, createdAt and updatedAt.
+Only the seven editable DTO fields are sent; embedded Team objects, IDs and timestamps are never
+submitted as writable data. The backend owns real/non-future dates, distinct existing teams,
+non-negative integer values, stadium normalization and duplicate date/home/away combinations.
+Frontend response readers reject malformed payloads before formatting dates or plotting values.
+
+AdminMatchStatsView uses the shared asynchronous editor, current-record GET before editing,
+normalized server responses after save, SweetAlert2 confirmation before DELETE, and dependency
+reload after deletion. Backend 400/409 feedback stays in the open form without resetting its draft.
+The form remains mounted during reload/error states. A stale 404 draft remains visible and disabled
+until canceled. Duplicate actions and responses from an earlier session cannot mutate current data.
+Regular users have read-only access; real authorization remains in NestJS. 401 clears the matching
+session and 403 refreshes the current role through `/auth/me`.
+
+MatchStats browsing and administration require Teams and MatchStats, not Players. Dashboard,
+Statistics, TeamComparison and Home wait for all three relevant collections. Requests may execute
+in parallel, but labels, tables, counts and charts appear only after every required response is
+successful and its relationship IDs exist in the loaded team snapshot. A missing dependency or
+cross-request relationship race produces error/retry feedback instead of guessed names or false
+zero counts. Reload failures hide previous analytical results until a complete retry succeeds.
+Empty collections remain valid data; zero goals and attendance remain valid values.
+
+`matchAnalytics.ts` centralizes match filters, standings, result distributions, match goals and
+roster goals. Standings reuse the same pure calculation as TeamComparison, including home/away
+results and attendance. Player season totals remain distinct from goals recorded in matches.
+Computed filters update charts without a page reload. No Statistics entity, persisted analytical
+cache, schema change, new HTTP client or dependency is introduced. The retired domain snapshot
+is deleted at startup; there are no browser persistence subscriptions. Unrelated storage keys are untouched.
+Legacy domain stores and seeders have been removed. Analytical views use disposable API snapshots.
+
+### Verification
+
+With Node 24.19.0 and npm 11.9.0, `npm ci` and `npm run verify` pass: ESLint, Prettier, application and
+test types, 149 tests and the production build. The 121 previous tests remain, with persistence
+expectations updated for MatchStats migration and a race fixture adjusted to use consistent IDs.
+Twenty-eight added tests cover transport/DTOs, errors, form/stale-record behavior, partial loads,
+retry, normalized relationships, filters, independent calculation expectations, zero/empty charts
+and rendered form feedback. The real NestJS/SQLite check verifies CRUD, unchanged duplicate keys on
+edit, duplicate 409, invalid dates/teams/numbers/stadium 400, missing IDs 404, team deletion conflicts,
+admin versus regular-user direct API authorization and guest 401. HTTP fixtures do not replace
+cryptographic or database checks. Manual browser testing remains a contributor step.
+
+### Run locally and test in the browser
+
+Use Node 24 compatible with both packages. In a terminal at `soccer-dashboard/backend`, run `npm ci`.
+Copy `.env.example` to `.env` only if `.env` does not exist. Set a private random `JWT_SECRET` in that
+local file before starting NestJS, preserve your SQLite path, and allow the exact Vite origin in
+`CORS_ORIGIN` (the example allows localhost:5173 and 127.0.0.1:5173). Do not commit `.env` or secrets.
+Run `npm run seed` if demo accounts are needed, then `npm run start:dev`. Seed is idempotent and does
+not reset modified existing accounts; no clean/reset seed is required for this frontend change.
+
+In a second terminal at `soccer-dashboard/frontend`, run `npm ci`, preserve or create `.env.local`
+from `.env.example`, set `VITE_API_BASE_URL=http://localhost:3000/api`, and run `npm run dev`.
+Open the URL Vite prints, normally http://localhost:5173. If Vite chooses another port, add that exact
+origin to backend CORS configuration and restart the backend. Restart Vite after changing its env.
+
+1. Login with `admin@soccer.example` / `AdminDemo123` (unless that seeded account was modified).
+2. Create two uniquely named teams with no previous matches. In match administration, create a
+   past-date home 3–away 1 match with attendance 120. Open MatchStats, Statistics, Dashboard and Team
+   Comparison: the new record must appear with the correct team names. The selected pair's results
+   are home W=1/GF=3/GA=1 and away L=1/GF=1/GA=3; attendance is 120 for each team's match result.
+   Season player goals are independent and should not increase merely from creating a match.
+3. Change the match to 0–0 and attendance 0. Match charts/comparison must show a draw and real zeros.
+   Try a duplicate with the same date/home/away: the server error stays inline and the draft remains.
+4. Test team/stadium/date filters, table captions and charts. Filters with no matches show empty
+   results. Cancel a delete and inspect Network: no DELETE or preliminary GET is sent. Confirm
+   deletion and verify the record disappears from match browsing and analytical pages.
+5. Stop the backend while navigating to an analytical page: it must show loading then error/retry,
+   without charts built from partial data. Restart the backend and retry to recover the snapshot.
+6. Login as `user@soccer.example` / `UserDemo123`: reads work and direct `/admin/match-stats` navigation
+   is blocked. The backend also rejects regular-user mutations even if the UI is bypassed.
+7. Reload the browser, login again, and confirm database persistence. The memory-only token is
+   intentionally lost on a full reload; losing login is not losing SQLite records.
+
 ### Formatting and dependency audit
 
 Frontend text files use LF, matching the default of the shared `.prettierrc.json`.
@@ -315,7 +384,7 @@ checkouts remain compatible with `npm run format:check` even with `core.autocrlf
 Keep the official Prettier configuration; do not bypass the check with `--end-of-line auto`.
 
 The previous high-severity development chain was
-`@vue/eslint-config-typescript → fast-glob → micromatch → braces`.
+@vue/eslint-config-typescript → fast-glob → micromatch → braces
 ESLint now uses the official `typescript-eslint` configuration directly with
 `eslint-plugin-vue` and the existing Vue/Prettier configuration. `typescript-eslint`
 was already installed transitively; it is now an explicit development dependency at
@@ -335,3 +404,39 @@ change; it should be reviewed as part of the next visual consistency phase.
 Use [Visual Studio Code](https://code.visualstudio.com/) with the
 [Vue - Official](https://marketplace.visualstudio.com/items?itemName=Vue.volar) and
 [Prettier](https://marketplace.visualstudio.com/items?itemName=esbenp.prettier-vscode) extensions.
+
+## Obsolete domain persistence cleanup — issue #55
+
+NestJS and SQLite are the only persisted domain source. The four frontend domain stores, four
+seeders, local ID generator and `PiniaConfig.ts` have been removed. Interfaces and DTOs remain
+because they define the typed API contracts. Pinia remains useful only for the shared, in-memory
+authentication state; page data and filters use Vue reactive state.
+
+`LegacyStorageService.clearObsoleteState()` runs once per application startup, before session
+reconciliation. It removes only the old `piniaState` key, without reading, parsing, migrating or
+backing up its contents. Unrelated storage keys are untouched. Repeated cleanup is idempotent and
+handles returning users of older deployments. If browser storage is blocked, a generic warning is
+logged and the application continues with the API; old state is never consumed as a fallback.
+No token, profile, fixture, domain record or UI preference is persisted by the application.
+
+Reloading starts a guest session under the approved memory-only token policy. After logging in,
+pages retrieve current backend records; they never recreate fictional frontend records. Backend
+seed commands remain available only for deliberate database setup. Full-stack smoke verification
+uses an isolated SQLite database, real NestJS login/CRUD, browser storage cleanup, and a new Pinia
+instance to model reload. The complete frontend `npm run verify` passes with 149 tests on Node 24.19.0.
+Both production and full dependency audits report zero vulnerabilities. The earlier high
+severity development findings were resolved upstream and incorporated through main.
+Manual browser checks remain required before final team approval.
+
+## Regresión full-stack (#56)
+
+Con frontend y backend instalados y el backend compilado, ejecutar desde esta carpeta:
+
+```sh
+npm run test:full-stack
+```
+
+La prueba usa una SQLite temporal y servicios reales mediante HTTP. Consultar
+[la matriz](../REGRESSION_MATRIX.md) y
+[la evidencia y pasos de navegador](../REGRESSION_EVIDENCE.md).
+Las verificaciones visuales y de contenedores deben completarse aparte.

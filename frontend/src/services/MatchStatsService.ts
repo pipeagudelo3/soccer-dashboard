@@ -1,251 +1,59 @@
 import type { CreateMatchStatsDTO } from '@/dtos/CreateMatchStatsDTO.js';
 import type { UpdateMatchStatsDTO } from '@/dtos/UpdateMatchStatsDTO.js';
 import type { MatchStatsInterface } from '@/interfaces/MatchStatsInterface.js';
-import { AuthService } from '@/services/AuthService.js';
-import type { ServiceResult } from '@/services/ServiceResult.js';
-import { TeamService } from '@/services/TeamService.js';
-import { useAuthStore } from '@/stores/authstore.js';
-import { useMatchStatsStore } from '@/stores/matchstatsstore.js';
-import { generateId } from '@/utils/generateId.js';
+import {
+  createRestResource,
+  isCount,
+  isId,
+  isRecord,
+  isText,
+  isTimestamp,
+} from '@/services/RestResource.js';
 
+// Validate the public date representation before formatting it; request business rules belong to NestJS.
+function isMatchDate(value: unknown): value is string {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T00:00:00.000Z`);
+  return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+function readMatch(value: unknown): MatchStatsInterface | null {
+  if (
+    !isRecord(value) ||
+    !isId(value.id) ||
+    !isMatchDate(value.date) ||
+    !isId(value.homeTeamId) ||
+    !isId(value.awayTeamId) ||
+    value.homeTeamId === value.awayTeamId ||
+    !isCount(value.goalsHomeTeam) ||
+    !isCount(value.goalsAwayTeam) ||
+    !isText(value.stadium) ||
+    !isCount(value.attendance) ||
+    !isTimestamp(value.createdAt) ||
+    !isTimestamp(value.updatedAt)
+  )
+    return null;
+  return {
+    id: value.id,
+    date: value.date,
+    homeTeamId: value.homeTeamId,
+    awayTeamId: value.awayTeamId,
+    goalsHomeTeam: value.goalsHomeTeam,
+    goalsAwayTeam: value.goalsAwayTeam,
+    stadium: value.stadium,
+    attendance: value.attendance,
+    createdAt: value.createdAt,
+    updatedAt: value.updatedAt,
+  };
+}
+const resource = createRestResource<MatchStatsInterface, CreateMatchStatsDTO, UpdateMatchStatsDTO>(
+  '/match-stats',
+  readMatch,
+  ['date', 'homeTeamId', 'awayTeamId', 'goalsHomeTeam', 'goalsAwayTeam', 'stadium', 'attendance'],
+);
 export class MatchStatsService {
-  static getMatchStats(): MatchStatsInterface[] {
-    return useMatchStatsStore().matchStats;
-  }
-
-  static getMatchStatsById(id: string): MatchStatsInterface | undefined {
-    return useMatchStatsStore().matchStats.find((matchStats) => matchStats.id === id);
-  }
-
-  static async createMatchStats(
-    payload: CreateMatchStatsDTO,
-  ): Promise<ServiceResult<MatchStatsInterface>> {
-    if (!AuthService.isAdmin()) {
-      return {
-        success: false,
-        errors: ['Administrator access is required.'],
-      };
-    }
-
-    const token = useAuthStore().accessToken;
-    const validatedPayload = await MatchStatsService.validateAndNormalizePayload(payload);
-
-    if (token !== useAuthStore().accessToken || !AuthService.isAdmin()) {
-      return { success: false, errors: ['The session has changed. Please sign in again.'] };
-    }
-
-    if (validatedPayload.errors.length > 0 || validatedPayload.payload === undefined) {
-      return { success: false, errors: validatedPayload.errors };
-    }
-
-    const timestamp = new Date().toISOString();
-    const matchStats: MatchStatsInterface = {
-      ...validatedPayload.payload,
-      id: generateId('match-stats'),
-      createdAt: timestamp,
-      updatedAt: timestamp,
-    };
-
-    useMatchStatsStore().addMatchStats(matchStats);
-
-    return { success: true, data: matchStats };
-  }
-
-  static async updateMatchStats(
-    id: string,
-    payload: UpdateMatchStatsDTO,
-  ): Promise<ServiceResult<MatchStatsInterface>> {
-    if (!AuthService.isAdmin()) {
-      return {
-        success: false,
-        errors: ['Administrator access is required.'],
-      };
-    }
-
-    const existingMatchStats = MatchStatsService.getMatchStatsById(id);
-
-    if (existingMatchStats === undefined) {
-      return { success: false, errors: ['The selected match statistics no longer exist.'] };
-    }
-
-    const candidatePayload: CreateMatchStatsDTO = {
-      date: payload.date ?? existingMatchStats.date,
-      homeTeamId: payload.homeTeamId ?? existingMatchStats.homeTeamId,
-      awayTeamId: payload.awayTeamId ?? existingMatchStats.awayTeamId,
-      goalsHomeTeam: payload.goalsHomeTeam ?? existingMatchStats.goalsHomeTeam,
-      goalsAwayTeam: payload.goalsAwayTeam ?? existingMatchStats.goalsAwayTeam,
-      stadium: payload.stadium ?? existingMatchStats.stadium,
-      attendance: payload.attendance ?? existingMatchStats.attendance,
-    };
-    const token = useAuthStore().accessToken;
-    const validatedPayload = await MatchStatsService.validateAndNormalizePayload(
-      candidatePayload,
-      id,
-    );
-
-    if (token !== useAuthStore().accessToken || !AuthService.isAdmin()) {
-      return { success: false, errors: ['The session has changed. Please sign in again.'] };
-    }
-
-    if (validatedPayload.errors.length > 0 || validatedPayload.payload === undefined) {
-      return { success: false, errors: validatedPayload.errors };
-    }
-
-    const updatedMatchStats: MatchStatsInterface = {
-      ...existingMatchStats,
-      ...validatedPayload.payload,
-      updatedAt: new Date().toISOString(),
-    };
-
-    useMatchStatsStore().updateMatchStats(updatedMatchStats);
-
-    return { success: true, data: updatedMatchStats };
-  }
-
-  static deleteMatchStats(id: string): ServiceResult<MatchStatsInterface> {
-    if (!AuthService.isAdmin()) {
-      return {
-        success: false,
-        errors: ['Administrator access is required.'],
-      };
-    }
-
-    const existingMatchStats = MatchStatsService.getMatchStatsById(id);
-
-    if (existingMatchStats === undefined) {
-      return { success: false, errors: ['The selected match statistics no longer exist.'] };
-    }
-
-    useMatchStatsStore().removeMatchStats(id);
-
-    return { success: true, data: existingMatchStats };
-  }
-
-  private static async validateAndNormalizePayload(
-    payload: CreateMatchStatsDTO,
-    excludedMatchStatsId?: string,
-  ): Promise<{
-    payload?: CreateMatchStatsDTO;
-    errors: string[];
-  }> {
-    const errors: string[] = [];
-    const date = payload.date.trim();
-    const stadium = payload.stadium.trim();
-    const [homeResult, awayResult] = await Promise.all([
-      TeamService.getTeamById(payload.homeTeamId),
-      TeamService.getTeamById(payload.awayTeamId),
-    ]);
-    if (!homeResult.success) return { errors: homeResult.errors };
-    if (!awayResult.success) return { errors: awayResult.errors };
-    const homeTeam = homeResult.data;
-    const awayTeam = awayResult.data;
-
-    if (!MatchStatsService.isValidIsoDate(date)) {
-      errors.push('Enter a valid match date.');
-    } else if (date > MatchStatsService.getCurrentIsoDate()) {
-      errors.push('Match date cannot be in the future.');
-    }
-
-    if (homeTeam === undefined) {
-      errors.push('Select an existing home team.');
-    }
-
-    if (awayTeam === undefined) {
-      errors.push('Select an existing away team.');
-    }
-
-    if (homeTeam !== undefined && awayTeam !== undefined && homeTeam.id === awayTeam.id) {
-      errors.push('Home and away teams must be different.');
-    }
-
-    if (!MatchStatsService.isNonNegativeInteger(payload.goalsHomeTeam)) {
-      errors.push('Home team goals must be a non-negative integer.');
-    }
-
-    if (!MatchStatsService.isNonNegativeInteger(payload.goalsAwayTeam)) {
-      errors.push('Away team goals must be a non-negative integer.');
-    }
-
-    if (stadium === '') {
-      errors.push('Stadium is required.');
-    }
-
-    if (!MatchStatsService.isNonNegativeInteger(payload.attendance)) {
-      errors.push('Attendance must be a non-negative integer.');
-    }
-
-    if (
-      MatchStatsService.matchExists(
-        date,
-        payload.homeTeamId,
-        payload.awayTeamId,
-        excludedMatchStatsId,
-      )
-    ) {
-      errors.push('Match statistics already exist for this date and pair of teams.');
-    }
-
-    if (errors.length > 0 || homeTeam === undefined || awayTeam === undefined) {
-      return { errors };
-    }
-
-    return {
-      errors: [],
-      payload: {
-        date,
-        homeTeamId: homeTeam.id,
-        awayTeamId: awayTeam.id,
-        goalsHomeTeam: payload.goalsHomeTeam,
-        goalsAwayTeam: payload.goalsAwayTeam,
-        stadium,
-        attendance: payload.attendance,
-      },
-    };
-  }
-
-  private static isNonNegativeInteger(value: number): boolean {
-    return Number.isFinite(value) && Number.isInteger(value) && value >= 0;
-  }
-
-  private static matchExists(
-    date: string,
-    homeTeamId: string,
-    awayTeamId: string,
-    excludedMatchStatsId?: string,
-  ): boolean {
-    return useMatchStatsStore().matchStats.some(
-      (matchStats) =>
-        matchStats.id !== excludedMatchStatsId &&
-        matchStats.date === date &&
-        matchStats.homeTeamId === homeTeamId &&
-        matchStats.awayTeamId === awayTeamId,
-    );
-  }
-
-  private static getCurrentIsoDate(): string {
-    const currentDate = new Date();
-    const year = currentDate.getFullYear();
-    const month = String(currentDate.getMonth() + 1).padStart(2, '0');
-    const day = String(currentDate.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  }
-
-  private static isValidIsoDate(value: string): boolean {
-    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-
-    if (match === null) {
-      return false;
-    }
-
-    const year = Number(match[1]);
-    const month = Number(match[2]);
-    const day = Number(match[3]);
-    const date = new Date(Date.UTC(year, month - 1, day));
-
-    return (
-      date.getUTCFullYear() === year &&
-      date.getUTCMonth() === month - 1 &&
-      date.getUTCDate() === day
-    );
-  }
+  static getMatchStats = resource.list;
+  static getMatchStatsById = resource.get;
+  static createMatchStats = resource.create;
+  static updateMatchStats = resource.update;
+  static deleteMatchStats = resource.remove;
 }

@@ -538,6 +538,7 @@ test('a late load cannot replace newer data', async () => {
   for (let count = 0; !release && count < 100; count++) await delay(2);
   assert.ok(release);
   teams = [team(secondId, 'New')];
+  players = [player(secondId)];
   await data.loadData();
   release();
   await delay(10);
@@ -705,42 +706,4 @@ test('a role downgrade closes an open write form while keeping read-only catalog
   assert.equal(auth.AuthService.isAdmin(), false);
   assert.ok(editor.feedbackErrors.value.length > 0);
   assert.equal(data.isReady.value, true);
-});
-test('legacy team/player snapshots cannot hydrate an API page or prevent local match migration', async () => {
-  const persistence = (await vite.ssrLoadModule(
-    '/src/PiniaConfig.ts',
-  )) as typeof import('../src/PiniaConfig.js');
-  const values = new Map<string, string>();
-  const storage = {
-    getItem: (key: string) => values.get(key) ?? null,
-    setItem: (key: string, value: string) => {
-      values.set(key, value);
-    },
-  };
-  const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
-  Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: storage });
-  const scope = effectScope();
-  scopes.push(scope);
-  try {
-    storage.setItem(
-      'piniaState',
-      JSON.stringify({
-        teams: { teams: [{ id: 'old-local-team' }] },
-        players: { players: [{ invalid: 'old-local-player' }] },
-        matchStats: { matchStats: [match] },
-      }),
-    );
-    const pinia = createPinia();
-    setActivePinia(pinia);
-    scope.run(() => persistence.configurePinia(pinia));
-    assert.equal(pinia.state.value.teams, undefined);
-    assert.equal(pinia.state.value.players, undefined);
-    assert.deepEqual(pinia.state.value.matchStats, { matchStats: [match] });
-    assert.ok(!storage.getItem('piniaState')?.includes('old-local-team'));
-    assert.ok(!storage.getItem('piniaState')?.includes('old-local-player'));
-  } finally {
-    scope.stop();
-    if (descriptor) Object.defineProperty(globalThis, 'localStorage', descriptor);
-    else Reflect.deleteProperty(globalThis, 'localStorage');
-  }
 });

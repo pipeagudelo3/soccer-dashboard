@@ -4,12 +4,12 @@ import type { MatchStatsInterface } from '@/interfaces/MatchStatsInterface.js';
 import type { PlayerInterface } from '@/interfaces/PlayerInterface.js';
 import type { TeamInterface } from '@/interfaces/TeamInterface.js';
 import { PlayerService } from '@/services/PlayerService.js';
-import { RecordedMatchService } from '@/services/RecordedMatchService.js';
+import { MatchStatsService } from '@/services/MatchStatsService.js';
 import { TeamService } from '@/services/TeamService.js';
 import { useAuthStore } from '@/stores/authstore.js';
 
 // Page snapshots are disposable, never a second persisted database or a fallback to seeders.
-export function useTeamPlayerData(includeMatches = false) {
+export function useTeamPlayerData(includeMatches = false, includePlayers = true) {
   const authStore = useAuthStore();
   const teams = ref<TeamInterface[]>([]);
   const players = ref<PlayerInterface[]>([]);
@@ -36,9 +36,11 @@ export function useTeamPlayerData(includeMatches = false) {
     try {
       const [teamResult, playerResult, matchResult] = await Promise.all([
         TeamService.getTeams(),
-        PlayerService.getPlayers(),
+        includePlayers
+          ? PlayerService.getPlayers()
+          : Promise.resolve({ success: true as const, data: [] as PlayerInterface[] }),
         includeMatches
-          ? RecordedMatchService.getMatches()
+          ? MatchStatsService.getMatchStats()
           : Promise.resolve({ success: true as const, data: [] as MatchStatsInterface[] }),
       ]);
       if (
@@ -50,11 +52,24 @@ export function useTeamPlayerData(includeMatches = false) {
         return;
       if (!teamResult.success || !playerResult.success || !matchResult.success) {
         loadErrors.value = [
-          ...new Set(
-            [teamResult, playerResult, matchResult].flatMap((result) =>
-              result.success ? [] : result.errors,
-            ),
-          ),
+          ...(!teamResult.success ? teamResult.errors.map((error) => `Teams: ${error}`) : []),
+          ...(!playerResult.success ? playerResult.errors.map((error) => `Players: ${error}`) : []),
+          ...(!matchResult.success
+            ? matchResult.errors.map((error) => `Match statistics: ${error}`)
+            : []),
+        ];
+        return;
+      }
+      const teamIds = new Set(teamResult.data.map((team) => team.id));
+      if (
+        playerResult.data.some((player) => player.teamId !== null && !teamIds.has(player.teamId)) ||
+        matchResult.data.some(
+          (match) => !teamIds.has(match.homeTeamId) || !teamIds.has(match.awayTeamId),
+        )
+      ) {
+        // Separate HTTP reads can straddle another administrator's team change. Never invent labels.
+        loadErrors.value = [
+          'Related teams changed while loading. Retry to load a consistent snapshot.',
         ];
         return;
       }
