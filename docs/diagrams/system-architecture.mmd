@@ -1,0 +1,17 @@
+flowchart TD
+  Browser["Navegador"] --> Vue["SPA Vue 3"]
+  Vue --> Router["Vue Router y guards"]
+  Vue --> Pinia["Pinia: sesión en memoria"]
+  Vue --> FrontServices["Composables y servicios frontend"]
+  FrontServices --> Axios["Cliente Axios central"]
+  Axios -->|"HTTP /api + JWT"| Nest["API NestJS"]
+  Nest --> Pipeline["Helmet, CORS, validación,\nfiltro de excepciones y logging"]
+  Pipeline --> Modules["Módulos de autenticación y dominio"]
+  Modules --> TypeORM["Servicios, repositorios y transacciones TypeORM"]
+  TypeORM --> SQLite[("SQLite persistente")]
+  SeedCLI["CLI explícita de seed"] --> TypeORM
+  Legacy["LegacyStorageService"] -->|"solo elimina piniaState obsoleto"| Storage["LocalStorage del navegador"]
+  Deploy["Infraestructura GCP\npendiente de verificación final"] -.-> Vue
+  Deploy -.-> Nest
+  Deploy -.-> SQLite
+

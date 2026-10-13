@@ -1,0 +1,54 @@
+classDiagram
+  class User {
+    +uuid id
+    +string name
+    +string email
+    +admin|user role
+    -string passwordHash
+    +datetime createdAt
+    +datetime updatedAt
+  }
+
+  class Team {
+    +uuid id
+    +string name
+    +string logoURL
+    +string country
+    +string stadium
+    +date foundedDate
+    +datetime createdAt
+    +datetime updatedAt
+  }
+
+  class Player {
+    +uuid id
+    +string name
+    +string position
+    +active|injured|suspended|free-agent status
+    +uuid? teamId
+    +integer goals
+    +integer assists
+    +datetime createdAt
+    +datetime updatedAt
+  }
+
+  class MatchStats {
+    +uuid id
+    +date date
+    +uuid homeTeamId
+    +uuid awayTeamId
+    +integer goalsHomeTeam
+    +integer goalsAwayTeam
+    +string stadium
+    +integer attendance
+    +datetime createdAt
+    +datetime updatedAt
+  }
+
+  Team "0..1" <-- "0..*" Player : teamId
+  Team "1" <-- "0..*" MatchStats : homeTeamId
+  Team "1" <-- "0..*" MatchStats : awayTeamId
+
+  note for Player "teamId admite null\nON DELETE SET NULL"
+  note for MatchStats "Equipos obligatorios y diferentes\nON DELETE RESTRICT"
+
