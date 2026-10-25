@@ -16,7 +16,7 @@ crear una base de datos, ejecutar seeds ni autenticarse.
 | Consulta desde frontend a server con fetch | `TeamService` utiliza el `$fetch` de Nuxt                          | `GET /api/teams` y `GET /api/teams/:id`                                  |
 | Páginas de equipos con SSR                 | `useAsyncData` espera el servicio; `ssr: true`, `prerender: false` | La respuesta HTTP ya contiene nombre y datos sin ejecutar JavaScript     |
 | Ruta principal y dos secundarias con CSR   | `/tools`, `/tools/points`, `/tools/faq`                            | `ssr: false`, contenido construido en navegador                          |
-| Publicación en GCP                         | A cargo de Juan Pablo; fuera del alcance de este PR               | Pendiente de despliegue y validación pública                            |
+| Publicación en GCP                         | A cargo de Juan Pablo; fuera del alcance de este PR                | Pendiente de despliegue y validación pública                             |
 
 La interfaz identifica los equipos como ficticios. El catálogo utiliza UUID y una
 proyección de `Team` con país, nombre, estadio y fecha de fundación. No agrega CRUD,
