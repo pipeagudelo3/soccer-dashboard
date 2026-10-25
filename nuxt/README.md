@@ -16,7 +16,7 @@ crear una base de datos, ejecutar seeds ni autenticarse.
 | Consulta desde frontend a server con fetch | `TeamService` utiliza el `$fetch` de Nuxt                          | `GET /api/teams` y `GET /api/teams/:id`                                  |
 | Páginas de equipos con SSR                 | `useAsyncData` espera el servicio; `ssr: true`, `prerender: false` | La respuesta HTTP ya contiene nombre y datos sin ejecutar JavaScript     |
 | Ruta principal y dos secundarias con CSR   | `/tools`, `/tools/points`, `/tools/faq`                            | `ssr: false`, contenido construido en navegador                          |
-| Publicación en GCP                         | Servidor Node de producción y Dockerfile preparados                | Pendiente de desplegar en la cuenta asignada y verificar la URL pública  |
+| Publicación en GCP                         | A cargo de Juan Pablo; fuera del alcance de este PR               | Pendiente de despliegue y validación pública                            |
 
 La interfaz identifica los equipos como ficticios. El catálogo utiliza UUID y una
 proyección de `Team` con país, nombre, estadio y fecha de fundación. No agrega CRUD,
@@ -151,8 +151,8 @@ Chromium comprobó la navegación entre los tres artículos y cuatro equipos,
 calculadora válida/inválida, FAQ, skip link, ausencia de errores de hidratación y
 32 combinaciones de ruta/ancho (320, 375, 768 y 1280 px) sin overflow horizontal.
 También se verificó blog y equipos con JavaScript desactivado y el shell vacío de CSR.
-La prueba del Dockerfile y la publicación en GCP permanecen pendientes; el entorno
-de implementación no dispone de Docker.
+El despliegue en GCP lo realizará Juan Pablo fuera de este PR. La verificación
+en la URL pública quedará pendiente hasta que esté disponible.
 
 ## 6. Prueba manual de producción
 
@@ -198,30 +198,11 @@ la instalación del proyecto NO tiene una auditoría limpia y el resultado puede
 cambiar con nuevas versiones. Antes de desplegar, repetir auditoría y revisión
 del artefacto. No exponer el servidor de desarrollo a internet.
 
-## 8. Despliegue híbrido en GCP
+## 8. Coordinación del despliegue
 
-Se debe publicar el servidor Node junto con **toda** la carpeta `.output`.
-Publicar únicamente `.output/public` o usar una generación completamente estática
-eliminaría el servidor necesario para la API y SSR.
+La publicación en GCP será realizada por Juan Pablo en su trabajo separado;
+no se incluyen archivos de Docker ni configuración de infraestructura en este PR.
 
-El `Dockerfile` contiene una etapa de build y otra que copia únicamente `.output`,
-ejecuta con usuario `node` y escucha en `PORT` (8080 por defecto). Las dependencias
-de desarrollo y del constructor no se copian a la imagen final. La imagen base
-`node:24-bookworm-slim` recibe actualizaciones; para una publicación fijada se debe
-registrar su digest en la evidencia de despliegue.
-
-Desde `nuxt/`, si Docker está disponible:
-
-```powershell
-docker build -t soccer-dashboard-nuxt .
-docker run --rm -p 3001:8080 soccer-dashboard-nuxt
-```
-
-La imagen está preparada para un servicio de contenedores o una VM de la cuenta
-GCP asignada. Aún falta confirmar el servicio permitido, proyecto, región, permisos
-y fecha límite. No se ha realizado despliegue, configurado un dominio, abierto
-puertos de la cuenta ni enviado un correo al docente.
-
-Antes de entregar: verificar las mismas rutas en la URL pública, adjuntar evidencia
-de SSG/SSR/CSR, enlazar el PR/issue y registrar la URL del repositorio y de GCP. Revisar
-y entender el código con el equipo antes de fusionarlo.
+Esta aplicación conserva el servidor Nitro necesario para SSR y para los
+endpoints `/api/teams`. Una publicación completamente estática de
+`.output/public` no cubriría esas funcionalidades.
