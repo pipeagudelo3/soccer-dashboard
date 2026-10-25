@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { NuxtLink } from '#components';
 import { computed } from 'vue';
+
+import { NuxtLink } from '#components';
 import { createError, definePageMeta, useAsyncData, useRoute, useSeoMeta } from '#imports';
 import { TeamService } from '~/services/TeamService';
 import { FormatUtils } from '~/utils/FormatUtils';

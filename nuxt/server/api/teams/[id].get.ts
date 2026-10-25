@@ -1,4 +1,5 @@
 import { createError, defineEventHandler, getRouterParam } from 'h3';
+
 import { TeamCatalogService } from '~~/server/services/TeamCatalogService';
 
 export default defineEventHandler((event) => {

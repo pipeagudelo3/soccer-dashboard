@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
+
 import { useSeoMeta } from '#imports';
 import { PointsUtils } from '~/utils/PointsUtils';
 

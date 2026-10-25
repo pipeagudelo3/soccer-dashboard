@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { NuxtLink } from '#components';
 import { computed } from 'vue';
+
+import { NuxtLink } from '#components';
 import { definePageMeta, useRoute, useSeoMeta } from '#imports';
 import { ArticleService } from '~/services/ArticleService';
 import { FormatUtils } from '~/utils/FormatUtils';

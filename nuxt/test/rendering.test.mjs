@@ -3,9 +3,9 @@ import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { access, readFile } from 'node:fs/promises';
 import { createServer } from 'node:net';
+import { test } from 'node:test';
 import { setTimeout } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
-import { test } from 'node:test';
 
 const projectDirectory = fileURLToPath(new URL('../', import.meta.url));
 

@@ -105,8 +105,10 @@ son requisitos del nuevo proyecto.
   páginas que genera Nuxt internamente sigue siendo responsabilidad del framework.
 - Los archivos de configuración y pruebas que ejecuta Node usan rutas relativas;
   las pruebas nativas importan `.ts` porque no pasan por el resolvedor de Nuxt.
-- ESLint comprueba imports de tipos, símbolos sin uso y prohíbe imports dinámicos,
-  rutas relativas y el alias alternativo `@/` dentro del código de aplicación.
+- ESLint comprueba imports de tipos, miembros importados y símbolos sin uso; también
+  prohíbe imports dinámicos, rutas relativas y el alias alternativo `@/` dentro de la
+  aplicación. `test/imports.test.mjs` verifica el orden alfabético de módulos y la
+  separación entre imports externos e internos, sin dependencias adicionales.
 - Se usa orden alfabético en contratos, métodos y declaraciones independientes;
   las declaraciones derivadas van después de sus dependencias.
 - Comentarios para decisiones no evidentes, sin comentar cada línea ni conservar
@@ -135,13 +137,16 @@ Se ejecutan con el test runner de Node, sin otro framework de pruebas.
   y códigos de error. No se limita a inspeccionar la configuración.
 - `test/utils.test.mjs`: cálculo de puntos, valores inválidos y fechas en distintas
   zonas horarias.
+- `test/imports.test.mjs`: agrupación de imports externos/internos y orden alfabético.
 
 `npm test` requiere haber ejecutado `npm run build`; `verify` lo hace en orden.
-El conteo de Node es de nueve pruebas, incluyendo el contenedor de integración.
+Con la prueba de imports añadida, el conteo esperado es de diez pruebas, incluyendo
+el contenedor de integración. Repetir `npm run verify` para confirmar el total.
 El éxito de estas pruebas no reemplaza recorrer la interfaz con JavaScript habilitado.
 
 Verificación realizada el 25 de octubre de 2026, con Node 24.22.1 y npm 11.9.0:
-`npm run verify` completo y nueve pruebas correctas. Una revisión adicional en
+`npm run verify` completo y nueve pruebas correctas antes del ajuste de imports.
+Una revisión adicional en
 Chromium comprobó la navegación entre los tres artículos y cuatro equipos,
 calculadora válida/inválida, FAQ, skip link, ausencia de errores de hidratación y
 32 combinaciones de ruta/ancho (320, 375, 768 y 1280 px) sin overflow horizontal.
